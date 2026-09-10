@@ -79,26 +79,40 @@ Se evalúan **en orden**; gana el primer `cuando` verdadero:
 
 ---
 
-## Futuro: el escritor del `.xlsm` (fase F8)
+## El escritor del `.xlsm` (`notebooks/escritor.py`) — fase F8, operativo
 
-Cuando la concordancia sea suficiente (ver `docs/VALIDACION_Y_CONTROL_CAMBIOS.md`), se
-agrega el paso que **escribe la matriz**. Diseño obligado por `docs/RIESGOS.md` R1:
+Escribe la matriz del mes a partir de los insumos. Reusa los extractores de `validacion.py`.
 
-```python
-class EscritorMatriz:
-    def __init__(self, plantilla_xlsm, destino_xlsm):
-        # load_workbook(plantilla, keep_vba=True, data_only=False)
-        # snapshot (hash) de: cada hoja Informe_*, rango NL:NO de General, vbaProject.bin
-        ...
-    def limpiar_datos(self):
-        "Borra SOLO A3:NK{última fila}. Nunca NL:NO. Nunca otras hojas."
-    def escribir(self, numero_contrato, columna, valor, traza):
-        "Valor LITERAL. Rechaza columna en NL:NO. Registra la traza."
-    def guardar(self):
-        "Re-verifica el hash de las hojas preservadas + VBA. Si cambió algo -> aborta sin guardar."
+```
+SIRECI ──► ex_datos_generales() ──► orden de filas + A:AE (migración directa)
+insumos ─► ex_<componente>()   ──► celdas {contrato, col, valor}  (10 bandas hoy)
+            calcular_cumplimientos()   añade META fija + CUMPLIMIENTO donde la fuente no lo trae
+                    │
+                    ▼
+   EscritorMatriz(plantilla)          load_workbook(keep_vba=True, data_only=False)
+     .mapear_filas(orden)             contrato -> nº de fila (usa la col A si ya venía)
+     .limpiar_datos()                 borra A3:NK ; nunca NL:NO
+     .volcar(celdas)                  escribe literales; rechaza col > NK
+     .guardar(destino)                guarda una COPIA (destino != plantilla) y llama a:
+                    │
+                    ▼
+   verificar_integridad(plantilla, generado) -> list[str]
+     · VBA presente en el generado
+     · mismo conjunto de hojas
+     · cada hoja distinta de General idéntica celda a celda
+       (números con tolerancia: openpyxl re-serializa el último dígito de los
+        valores cacheados de las fórmulas — eso es ruido, no un cambio)
+     · fórmulas NL:NO de General intactas fila por fila
 ```
 
-Invariantes:
+Salida: `salidas/<mes>/7.SEGUIMIENTO CONTRACTUAL SAVIA PPAL_<MES>.xlsm` +
+`reporte_llenado.xlsx` (resumen con la verificación de integridad, cobertura,
+concordancia por banda vs la matriz de referencia, y `a_revisar`).
+
+Sobre julio: integridad **OK**, ~96 % de concordancia en las 10 bandas con extractor.
+Cada extractor nuevo (F4–F7) llena su banda automáticamente.
+
+Invariantes (de `docs/RIESGOS.md` R1):
 
 - **Nunca** `pandas.to_excel` sobre este libro (borra fórmulas y VBA).
 - `data_only=False` para conservar las fórmulas de `NL:NO`.

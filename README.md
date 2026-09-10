@@ -26,18 +26,20 @@ resultado, y correr sus macros como siempre.
 ## Estado (septiembre 2026)
 
 Ya se recibió la **data real de julio** (insumos crudos + matriz diligenciada), lo que
-permite validar el proceso antes de que nadie dependa de él:
+permite validar el proceso contra el trabajo manual:
 
 - **Mapa de fuentes verificado archivo por archivo** → [`config/fuentes.yaml`](config/fuentes.yaml)
-- **Motor + notebook operativos** → validan el esquema de las 20+ fuentes y reconstruyen
-  10 componentes con **~92 % de concordancia** celda a celda contra la matriz de julio.
+- **Validación de fuentes + concordancia** — valida el esquema de las 20+ fuentes y
+  reconstruye 10 componentes.
+- **Escritura de la matriz** (`notebooks/escritor.py`) — toma la plantilla del mes anterior,
+  diligencia `A3:NK` celda a celda para esas 10 bandas, y **verifica** que no se tocaron las
+  fórmulas `NL:NO`, las hojas `Informe_*` ni el VBA. Sobre julio: **~96 % de concordancia**
+  con la matriz diligenciada a mano, integridad OK.
 - Re-evaluación, discrepancias, bloqueos y plan por fases → [`docs/REEVALUACION_2026-09.md`](docs/REEVALUACION_2026-09.md)
 
-**Para llegar al objetivo falta:** extractores de 8 bandas (1552, ayudas dx, domiciliaria,
-salud oral, hogares, oxígeno, MOS, planificación familiar), 3 decisiones de negocio
-(categorías, REPS de sede, ponderación RS/RC), 4 insumos que no llegan por este canal, y
-el **escritor del `.xlsm`** (`keep_vba`, celda a celda — fase F8, diseñado en
-[`docs/ARQUITECTURA.md`](docs/ARQUITECTURA.md)).
+**Para completar el 100 % de la matriz falta:** extractores de 8 bandas (1552, ayudas dx,
+domiciliaria, salud oral, hogares, oxígeno, MOS, planificación familiar), 3 decisiones de
+negocio (categorías, REPS de sede, ponderación RS/RC) y 4 insumos que no llegan por este canal.
 
 ---
 
@@ -58,16 +60,23 @@ el **escritor del `.xlsm`** (`keep_vba`, celda a celda — fase F8, diseñado en
 
    Los insumos se buscan **recursivamente** en todas las subcarpetas — no hay que listar
    cada ruta. Si la unidad no está conectada, cae a `docs/Insumos/` y avisa.
-3. Ejecutar el notebook. Genera **`salidas/validacion/<fecha>/reporte_validacion.xlsx`**.
-4. Revisar ese Excel — guía paso a paso en **[`docs/GUIA_DE_USO.md`](docs/GUIA_DE_USO.md)**.
+3. Ejecutar el notebook. Produce dos cosas:
+   - **`salidas/validacion/<fecha>/reporte_validacion.xlsx`** — validación de fuentes + concordancia.
+   - **`salidas/<mes>/7.SEGUIMIENTO CONTRACTUAL SAVIA PPAL_<MES>.xlsm`** — la matriz diligenciada
+     (bandas con extractor) + **`reporte_llenado.xlsx`** de control.
+4. Abrir la matriz generada, revisarla con el `reporte_llenado.xlsx`, ajustar lo que falte,
+   y correr las macros como siempre. Guía paso a paso en **[`docs/GUIA_DE_USO.md`](docs/GUIA_DE_USO.md)**.
 
-El notebook **solo lee**: no escribe en la matriz ni toca los archivos fuente. **No se
-rompe** si falta la unidad o un insumo — lo reporta y sigue.
+No toca los archivos fuente ni la plantilla; escribe una **copia** en `salidas/`. La
+escritura **verifica** después de guardar que las fórmulas `NL:NO`, las hojas `Informe_*` y
+el VBA quedaron intactos (aborta el reporte con el detalle si algo cambió). **No se rompe**
+si falta la unidad o un insumo — lo reporta y sigue.
 
 ### Sin abrir Jupyter
 
 ```bash
-python notebooks/validacion.py          # corre con los valores por defecto y escribe el reporte
+python notebooks/validacion.py    # validación de fuentes + concordancia -> reporte_validacion.xlsx
+python notebooks/escritor.py      # + escribe la matriz del mes         -> salidas/<mes>/...xlsm
 ```
 
 o desde cualquier script / REPL:
@@ -82,7 +91,9 @@ res["que_revisar"]          # DataFrame con las acciones pendientes
 
 ---
 
-## El objeto reporte (`reporte_validacion.xlsx`)
+## Salidas
+
+**`reporte_validacion.xlsx`** (validación de fuentes + concordancia):
 
 | Hoja | Para qué |
 |---|---|
@@ -97,12 +108,18 @@ res["que_revisar"]          # DataFrame con las acciones pendientes
 | `concordancia_detalle` | una fila por celda comparada (contrato, columna, valor proceso vs objetivo) |
 | `log_extraccion` | qué componente se extrajo y cuántas celdas produjo |
 
+**`7.SEGUIMIENTO...<MES>.xlsm`** — la matriz diligenciada (bandas con extractor), y
+**`reporte_llenado.xlsx`** de control: `resumen` (incl. verificación de integridad
+VBA/fórmulas), `cobertura`, `concordancia_por_banda`, `a_revisar` (celdas que no cuadran
+con la referencia), `log_extraccion`.
+
 ---
 
 ## Cómo se implementa / se extiende
 
-Todo el motor está en **`notebooks/validacion.py`** (un solo archivo, ~900 líneas, sin
-dependencias del proyecto). Estructura interna:
+El motor está en **`notebooks/validacion.py`** (validación + extractores + concordancia) y
+**`notebooks/escritor.py`** (escribe el `.xlsm`, reusa los extractores de `validacion`).
+Estructura interna de `validacion.py`:
 
 ```
 norm_texto / norm_nit / norm_contrato / es_na / parse_umbral   normalización de llaves y metas
@@ -126,11 +143,13 @@ run(mes, ruta_unidad, ...)                                     orquesta todo y e
    if (r := ruta("salud_oral")):
        intentar("salud_oral", lambda: ex_salud_oral(r, C["salud_oral"], idx))
    ```
-4. Correr el notebook; su banda aparece en `concordancia_por_banda`. Iterar contra el %.
+4. Si además necesita calcular la celda de `CUMPLIMIENTO`, añadir la tripleta en
+   `TRIPLETAS_CALCULAR` de `escritor.py`.
+5. Correr el notebook; su banda aparece en `concordancia_por_banda`. Iterar contra el %.
 
 Orden recomendado (ver `docs/REEVALUACION_2026-09.md` §8): primero **aplicabilidad**
 (mapa `CATEGORÍA DEL CONTRATO → componentes`), **normalización/alias** y **motor de reglas**
-— eso sube lo ya hecho de 92 % a ~99 % sin escribir un extractor nuevo.
+— eso sube lo ya hecho a ~99 % sin escribir un extractor nuevo.
 
 ### Utilidad: regenerar el catálogo de columnas de `General`
 
@@ -158,18 +177,21 @@ config/
   reps_maestra.csv.example   plantilla para el resolvedor NIT↔REPS↔sede (Resolución 1552, futuro)
 notebooks/
   01_validacion_fuentes_y_concordancia.ipynb   ← punto de entrada
-  validacion.py                                 el motor
+  validacion.py                                 validación de fuentes + extractores + concordancia
+  escritor.py                                   escribe la matriz del mes (celda a celda, verifica VBA/fórmulas)
   catalogo_indicadores.py                       utilidad standalone
   _build_notebook.py                            genera el .ipynb
 docs/
-  GUIA_DE_USO.md             ← guía para el analista (qué mirar en el reporte, mes a mes)
+  GUIA_DE_USO.md             ← guía para el analista (qué mirar, mes a mes)
   REEVALUACION_2026-09.md     re-evaluación con la data real: mapa, discrepancias, bloqueos, plan
-  ARQUITECTURA.md             flujo del motor + diseño del escritor .xlsm (futuro)
+  ARQUITECTURA.md             flujo del motor + escritor del .xlsm
   RIESGOS.md                  los 5 riesgos duros y su mitigación
   VALIDACION_Y_CONTROL_CAMBIOS.md   regresión vs mes de referencia + acta de cambios
   ERRORES_INSTRUCTIVO_FO-GC-47.md   erratas de copy-paste del instructivo
   Insumos/  Objetivo/         datos de referencia de julio (no van al repo)
-salidas/                      reportes generados (no van al repo)
+salidas/
+  validacion/<fecha>/reporte_validacion.xlsx        (no van al repo)
+  <mes>/7.SEGUIMIENTO...xlsm  +  reporte_llenado.xlsx
 ```
 
 ---

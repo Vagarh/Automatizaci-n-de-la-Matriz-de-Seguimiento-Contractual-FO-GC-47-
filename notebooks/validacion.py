@@ -50,13 +50,18 @@ _NA = {None, "", "NA", "N/A", "N.A", "N.A.", "#N/A", "#DIV/0!", "#VALUE!", "SD",
        "nan", "NaN", "None", "-", "--"}
 
 
+_NA_UP = {s.upper() for s in _NA if isinstance(s, str)}
+
+
 def es_na(x) -> bool:
     if x is None:
         return True
     if isinstance(x, float) and math.isnan(x):
         return True
+    if x is pd.NaT or (hasattr(x, "__class__") and x.__class__.__name__ == "NaTType"):
+        return True
     if isinstance(x, str):
-        return x.strip().upper() in {s.upper() for s in _NA if isinstance(s, str)}
+        return x.strip().upper() in _NA_UP
     return False
 
 
@@ -234,8 +239,13 @@ def resolver_archivo(carpeta: Path, patron: str) -> Path | None:
 
 
 def leer_hoja(ruta: Path, hoja, fila_encabezado: int) -> pd.DataFrame:
-    """fila_encabezado es 1-based (como se ve en Excel)."""
-    df = pd.read_excel(ruta, sheet_name=hoja, header=fila_encabezado - 1, engine="openpyxl", dtype=object)
+    """fila_encabezado es 1-based (como se ve en Excel).
+
+    `keep_default_na=False`: los 'N/A' / 'NA' que el analista escribe LITERALES en los
+    insumos se conservan como texto (los interpreta `es_na()` aguas abajo), no como NaN.
+    """
+    df = pd.read_excel(ruta, sheet_name=hoja, header=fila_encabezado - 1, engine="openpyxl",
+                       dtype=object, keep_default_na=False, na_values=[])
     df.columns = [str(c).strip() if c is not None else f"_col{i}" for i, c in enumerate(df.columns)]
     return df
 
@@ -406,6 +416,72 @@ def indice_llaves(general: pd.DataFrame) -> dict:
 # ===========================================================================
 def _rows(*triples):
     return [{"numero_contrato": a, "col": b, "valor": c} for a, b, c in triples if a]
+
+
+# --- Datos generales: SIRECI -> columnas A:AE de General (migración directa) ---
+MAPEO_SIRECI_GENERAL = {
+    "A": "NUMERO DE CONTRATO",
+    "B": "CONTRATISTA : NUMERO DEL NIT",
+    "C": "REPS",
+    "D": "CONTRATISTA : NOMBRE COMPLETO",
+    "E": "OBJETO DEL CONTRATO",
+    "F": "REGIMEN",
+    "G": "NATURALEZA JURIDICA: RED PUBLICA / PRIVADA",
+    "H": "MODALIDAD",
+    "I": "CATEGORIA DEL CONTRATO SEGUIMIENTO A LA RED",
+    "J": "SUBREGION",
+    "K": "MUNICIPIO",
+    "L": "VALOR INICIAL DEL CONTRATO En pesos",
+    "M": "ADICIONES : VALOR TOTAL",
+    "N": "VALOR TOTAL INCLUIDA ADICION  En pesos",
+    # O/P/Q (PLAZO INICIAL / TIEMPO PRÓRROGAS / INCLUIDA PRÓRROGA): el objetivo los deja
+    # casi siempre en blanco -> no se migran para no ensuciar la comparación.
+    "R": "FECHA INICIO CONTRATO",
+    "S": "FECHA TERMINACION CONTRATO",
+    "T": "TOTAL FACTURACION ACUMULADA",
+    "U": "PORCENTAJE AVANCE PRESUPUESTAL PROGRAMADO",
+    "V": "PORCENTAJE AVANCE PRESUPUESTAL REAL",
+    "W": "%  SOBREEJECUCION / SUBEJECUCION",
+    "X": "ESTADO DE LEGALIZACION",
+    "Y": "CORTE SIRECI",
+    "Z": "POLIZA CUMPLIMIENTO VIGENCIA DESDE",
+    "AA": "POLIZA CUMPLIMIENTO  VIGENCIA HASTA",
+    "AB": "POLIZA CUMPLIMIENTO",
+    "AC": "POLIZA RC  VIGENCIA DESDE",
+    "AD": "POLIZA RC  VIGENCIA HASTA",
+    "AE": "POLIZA RC",
+}
+
+
+def ex_datos_generales(ruta, cfg, idx=None) -> list[dict]:
+    """Migración directa SIRECI -> A:AE. Además define el ORDEN de filas de General
+    (el objetivo de julio está en el mismo orden que SIRECI)."""
+    df = leer_hoja(ruta, cfg["hoja"], cfg["fila_encabezado"])
+    cols = {norm_texto(c): c for c in df.columns}
+    out = []
+    for _, r in df.iterrows():
+        contrato = norm_contrato(r.get(cols.get(norm_texto("NUMERO DE CONTRATO"), "NUMERO DE CONTRATO")))
+        if not contrato:
+            continue
+        for gcol, scol in MAPEO_SIRECI_GENERAL.items():
+            real = cols.get(norm_texto(scol))
+            if real is None:
+                continue
+            out.append({"numero_contrato": contrato, "col": gcol, "valor": r.get(real)})
+    return out
+
+
+def orden_contratos_sireci(ruta, cfg) -> list[str]:
+    df = leer_hoja(ruta, cfg["hoja"], cfg["fila_encabezado"])
+    cols = {norm_texto(c): c for c in df.columns}
+    col = cols.get(norm_texto("NUMERO DE CONTRATO"), "NUMERO DE CONTRATO")
+    vistos, orden = set(), []
+    for _, r in df.iterrows():
+        c = norm_contrato(r.get(col))
+        if c and c not in vistos:
+            vistos.add(c)
+            orden.append(c)
+    return orden
 
 
 def ex_auditoria_calidad(ruta, cfg, idx) -> list[dict]:

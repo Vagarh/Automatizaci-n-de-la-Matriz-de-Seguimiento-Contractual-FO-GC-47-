@@ -58,13 +58,29 @@ SUBCARPETA  = ""                                             # dejar vacío salv
 
 Menú **Run → Run All Cells**. Tarda ~1–2 minutos.
 
-Al final imprime la ruta del reporte, algo como:
+Al final produce dos cosas:
 
 ```
-salidas\validacion\2026-09-15_0930\reporte_validacion.xlsx
+salidas\validacion\<fecha>\reporte_validacion.xlsx          ← control de fuentes + concordancia
+salidas\<mes>\7.SEGUIMIENTO CONTRACTUAL SAVIA PPAL_<MES>.xlsm  ← la matriz diligenciada
+salidas\<mes>\reporte_llenado.xlsx                          ← control de lo que se llenó
 ```
 
-### 5. Abrir ese Excel y revisarlo en orden
+### 5. Revisar
+
+**Primero** `reporte_validacion.xlsx` (hojas `que_revisar` / `faltantes`) para saber si
+llegó todo. **Después** abrir la matriz generada y revisarla con `reporte_llenado.xlsx`:
+
+- Hoja `resumen` → que `integridad_vba_formulas` diga **OK** (si no, no usar el archivo:
+  avisar a quien mantiene el proyecto).
+- Hoja `a_revisar` → celdas donde el cálculo no coincidió con la referencia.
+- Hoja `cobertura` → qué bandas quedaron llenas y cuáles hay que completar a mano.
+
+Completar/ajustar lo que falte en la matriz generada y correr las macros como siempre.
+
+> La matriz generada hoy llena **10 bandas** (Datos Generales, Auditoría, Financieros,
+> Acceso, Concurrencia, MIPRES, Transporte, Medicamentos, Tutelas, Extramuralidad). El
+> resto sigue siendo manual hasta que se agreguen sus extractores.
 
 ---
 
@@ -154,6 +170,7 @@ contra el trabajo manual, para dirigir la revisión. El llenado del `.xlsm` es u
 siguiente (ver `docs/REEVALUACION_2026-09.md` §8).
 
 **¿Puedo correrlo sin Jupyter?**
-Sí: `python notebooks/validacion.py` corre con los valores por defecto y escribe el reporte.
+Sí: `python notebooks/validacion.py` (control de fuentes) y `python notebooks/escritor.py`
+(escribe la matriz) corren con los valores por defecto.
 Para cambiar el mes o la ruta, editar la última sección de ese archivo o llamar a
 `validacion.run(...)` desde Python.

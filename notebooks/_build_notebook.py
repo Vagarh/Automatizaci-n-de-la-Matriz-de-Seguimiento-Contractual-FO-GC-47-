@@ -209,6 +209,45 @@ wb.close()
 """)
 
 md(r"""
+## 6. Generar la matriz del mes (escritura del `.xlsm`)
+
+Esto es el **objetivo**: a partir de los insumos, escribir la matriz diligenciada.
+Toma la **plantilla** (el `.xlsm` del mes anterior), limpia `A3:NK`, escribe celda a
+celda las bandas que hoy tienen extractor, y **verifica** que no se tocaron las fórmulas
+`NL:NO`, las hojas `Informe_*` ni el VBA.
+
+Salida: `salidas/<mes>/7.SEGUIMIENTO CONTRACTUAL SAVIA PPAL_<MES>.xlsm` + `reporte_llenado.xlsx`.
+""")
+
+code(r'''
+import escritor as E
+
+PLANTILLA = RAIZ / "docs" / "Insumos" / "7.SEGUIMIENTO CONTRACTUAL SAVIA PPAL_JULIO.xlsm"
+# En operación: el .xlsm del mes ANTERIOR (agosto para cerrar septiembre, etc.).
+
+gen = E.llenar(mes=MES, ruta_unidad=RUTA_UNIDAD, subcarpeta_insumos=SUBCARPETA,
+               plantilla_xlsm=PLANTILLA, matriz_objetivo=MATRIZ_OBJETIVO)
+
+print("\\nMatriz generada :", gen["matriz"])
+print("Integridad VBA/fórmulas/plantillas:", "OK" if not gen["problemas_integridad"] else gen["problemas_integridad"])
+gen["resumen"]
+''')
+
+code(r"""
+# Concordancia de la matriz GENERADA contra la de referencia, por banda
+if not gen["concordancia_por_banda"].empty:
+    display(gen["concordancia_por_banda"])
+    print(f"\nGlobal: {gen['concordancia_global']} %  (sobre las bandas con extractor)")
+""")
+
+md(r"""
+> La matriz generada tiene diligenciadas las **10 bandas con extractor** (~96 % de
+> concordancia con el trabajo manual). El resto queda como en la plantilla. Las
+> diferencias que faltan son los bloqueos conocidos (mapa de categorías, ponderación
+> RS/RC, alias) — ver `reporte_llenado.xlsx` hoja `a_revisar` y `docs/REEVALUACION_2026-09.md`.
+""")
+
+md(r"""
 ---
 
 ### Estado y próximos pasos
@@ -216,11 +255,11 @@ md(r"""
 | Bloque | Estado |
 |---|---|
 | Validación de esquema de fuentes (20+ componentes) | ✅ operativo |
-| Extracción + concordancia | ✅ 10 componentes (~92 %) |
+| Extracción + concordancia | ✅ 10 componentes |
+| **Escritura del `.xlsm`** (celda a celda, `keep_vba`, verifica fórmulas/VBA) | ✅ operativo — 10 bandas, ~96 % vs julio |
 | Bandas pendientes de extractor | Medicina Domiciliaria · Salud Oral · Hogares de Paso · Oxígeno · MOS · **Resolución 1552** · Planificación Familiar · **Ayudas Diagnósticas** |
 | Bloqueos de negocio | mapa `CATEGORÍA DEL CONTRATO → componentes que aplican` · resolvedor `NIT ↔ REPS ↔ sede` (1552) · ponderación RS/RC en financieros |
 | Insumos faltantes | Tablero de Cápitas · INFORME CÁPITA Y MOVILIDAD · 2 Google Sheets (PGP, PQRSD) |
-| Escritura del `.xlsm` (celda a celda, `keep_vba`) | pendiente — ver `docs/ARQUITECTURA.md` |
 
 Detalle en **`docs/REEVALUACION_2026-09.md`**.
 """)

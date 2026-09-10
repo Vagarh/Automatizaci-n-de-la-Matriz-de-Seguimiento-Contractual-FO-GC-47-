@@ -21,7 +21,7 @@
 |---|---|
 | **Lo más importante** | Ya tenemos el **par de referencia de julio completo**: `docs/Insumos/…xlsm` viene con la hoja `General` **vacía** (plantilla de entrada) y `docs/Objetivo/…xlsm` viene **diligenciada** (657 contratos, 245.884 celdas con dato, 228.145 en bandas de indicadores). Esto **desbloquea la validación por regresión** (era el bloqueo §7.3 del README). |
 | **Fuentes** | De 20 componentes: **16 con archivo presente y validado**, **1 hoja heterogénea sin automatizar** (Ayudas Diagnósticas), **1 no aplica** (Salud Mental), **2 en Google Sheets sin acceso** (PGP, PQRSD), **1 archivo faltante** (Tablero de Cápitas para nota técnica), **1 dudoso** (INFORME CÁPITA Y MOVILIDAD, no lo menciona `Indicaciones.txt`). |
-| **Primera reconstrucción** | Notebook `notebooks/01_validacion_fuentes_y_concordancia.ipynb` reconstruye hoy **10 componentes** y logra **~92 % de concordancia celda a celda** contra la matriz objetivo (9.147 celdas comparadas). Las diferencias están **clasificadas** (ver §6). |
+| **Reconstrucción** | El notebook reconstruye hoy **10 componentes** con **~92 %** de concordancia (validación de fuentes) y, con el **escritor** (`notebooks/escritor.py`), **escribe la matriz de julio** —celda a celda, preservando `NL:NO`, `Informe_*` y VBA— con **~96 %** de concordancia contra la diligenciada a mano. Las diferencias están **clasificadas** (ver §6). |
 | **Bloqueos que siguen** | (a) lista cerrada de `CATEGORÍA DEL CONTRATO` y su mapa a componentes que aplican; (b) resolvedor `NIT ↔ REPS ↔ sede` para la Resolución 1552; (c) fórmula exacta de ponderación RS/RC en financieros. |
 | **Errores de `Indicaciones.txt` / `fuentes.yaml`** | 8 discrepancias con los archivos reales, ya corregidas en `config/fuentes.yaml` (ver §4). |
 
@@ -204,6 +204,7 @@ Cada fase deja algo **ejecutable** y **medible contra julio**.
 | Fase | Entregable | Criterio de salida | Depende de |
 |---|---|---|---|
 | **F0 — hecho** | `config/fuentes.yaml` + `validacion.py` + notebook + este documento | El notebook corre sobre `docs/Insumos` y emite el reporte | — |
+| **F8 — hecho** | `notebooks/escritor.py`: escribe `A3:NK` celda a celda, `keep_vba`, `verificar_integridad()` compara hojas preservadas + `NL:NO` + VBA contra la plantilla tras guardar | La matriz generada preserva fórmulas/plantillas/VBA (integridad OK) y llega a ~96 % vs julio en las 10 bandas con extractor | F0 |
 | **F1 — Aplicabilidad** | `config/categorias.yaml`: lista cerrada de `CATEGORÍA` + mapa a componentes; función `aplica(componente, contrato)` | Los 254 `objetivo_NA_proceso_valor` bajan a < 20 | B1 |
 | **F2 — Normalización + alias** | `transform/normalizar.py` real + `equivalencias.yaml` sembrado con los alias que salgan del reporte (`municipios_sin_equivalencia`, `ips_sin_equivalencia`) | Los `llave_no_cruzada` bajan a < 30 | reporte F0 |
 | **F3 — Motor de reglas** | `transform/motor_reglas.py` implementado (las 7 variantes) + validado contra los `Cumplimiento` que ya traen `9.Consolidado` y `FO-RS-96` | 100 % de coincidencia en celdas `CUMPLIMIENTO` de los 10 componentes actuales | F2 |
@@ -211,11 +212,11 @@ Cada fase deja algo **ejecutable** y **medible contra julio**.
 | **F5 — Resolución 1552** | `transform/reps.py` (resolvedor de sedes) + extractor 1552 | Banda `GB:JA` ≥ 95 % vs julio | B2 |
 | **F6 — Ayudas Diagnósticas** | 1 parser por familia de plantilla + consolidador | Banda `LD:NH` ≥ 90 % de las IPS que reportaron | B5 |
 | **F7 — Insumos faltantes** | Conectores Google Sheets (PGP, PQRSD) + lectores Tablero Cápitas / INFORME CÁPITA | Bandas de acceso/financieros/PQRSD completas | B4 |
-| **F8 — Escritura del `.xlsm`** | `load/escritor_matriz.py`: `openpyxl(keep_vba=True)`, celda a celda `A3:NK`, hash de hojas preservadas antes/después | El `.xlsm` generado abre en Excel, corre las macros, y `NL:NO` recalcula igual | F3 |
-| **F9 — Regresión formal** | `validate/regresion.py`: `CUMPLIMIENTO` 100 %, `RESULTADO`/datos generales ≥ 99 %, cero `dato` sin explicar | Umbral alcanzado sobre julio (y un 2.º mes cuando llegue agosto) | F8 |
-| **F10 — Operación asistida** | Corrida en paralelo al proceso manual 1-2 meses + acta de cambios (`control_cambios.py`) | El analista valida 2 cierres seguidos sin corrección relevante | F9 |
+| **F9 — Regresión formal** | umbral: `CUMPLIMIENTO` 100 %, `RESULTADO`/datos generales ≥ 99 %, cero `dato` sin explicar | Umbral alcanzado sobre julio (y un 2.º mes cuando llegue agosto) | F1–F4 |
+| **F10 — Operación asistida** | corrida en paralelo al proceso manual 1-2 meses + acta de cambios entre versiones del entregable | El analista valida 2 cierres seguidos sin corrección relevante | F9 |
 
-Orden recomendado: **F1 → F2 → F3** primero (suben la concordancia de lo que ya hay del 92 % a ~99 % sin escribir un solo extractor nuevo), y en paralelo pedir B1/B4.
+Orden recomendado: **F1 → F2 → F3** primero (suben la concordancia de lo que ya hay a ~99 % sin escribir un solo extractor nuevo), y en paralelo pedir B1/B4. El escritor (F8) ya está;
+al agregar cada extractor (F4–F7) su banda se llena automáticamente.
 
 ---
 
@@ -236,8 +237,9 @@ Orden recomendado: **F1 → F2 → F3** primero (suben la concordancia de lo que
    - `FALTA_INSUMO` → fuente que no se entrega por este canal (Google Sheets, Tablero de Cápitas).
 5. Revisar **`concordancia_por_banda`** y **`concordancia_detalle`**:
    - diferencias nuevas respecto del mes anterior → clasificar (dato / regla / llave).
-6. (Cuando exista F8) generar el `.xlsm`, abrirlo, correr las macros como siempre.
-7. Adjuntar el **acta de cambios** al entregable.
+6. El notebook genera `salidas/<mes>/7.SEGUIMIENTO…_<MES>.xlsm` + `reporte_llenado.xlsx`.
+   Revisar `reporte_llenado.xlsx` → `resumen` (que la integridad diga `OK`) y `a_revisar`.
+7. Abrir la matriz generada, completar/ajustar las bandas que falten, correr las macros como siempre.
 
 El notebook **no reemplaza** el criterio del analista todavía: es el tablero que le dice
 **qué mirar** y **dónde no coincide**, para que su revisión sea dirigida y no celda por celda.
