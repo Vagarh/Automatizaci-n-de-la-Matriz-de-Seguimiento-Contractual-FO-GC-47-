@@ -6,6 +6,12 @@
 >
 > Este documento re-evalúa el alcance con esos datos en la mano: qué se confirmó, qué
 > cambió, qué falta, y el plan para llegar a una corrida mensual repetible.
+>
+> **Objetivo final:** que cada mes, con los insumos de ese mes, el proceso **diligencie la
+> matriz nueva** (`…_<MES>.xlsm`) y entregue un **reporte de control**, de modo que el
+> analista pase de *armar* la matriz a **validar y ajustar** el resultado. La comparación
+> contra julio de este documento es el paso previo para asegurar que lo que el proceso va a
+> llenar coincide con el diligenciamiento manual.
 
 ---
 

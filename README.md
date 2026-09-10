@@ -12,19 +12,32 @@ abre, revisa y sobre el que corre sus macros.
 
 ---
 
+## Objetivo
+
+Que a partir de un cierre mensual, **con los insumos del mes**, el proceso:
+
+1. **diligencie la matriz de ese mes** (`7.SEGUIMIENTO CONTRACTUAL SAVIA PPAL_<MES>.xlsm`,
+   respetando fórmulas y macros), y
+2. entregue un **reporte de control** de lo que llenó y de lo que no cuadra,
+
+de modo que el trabajo del analista pase de *armar* la matriz a **validar y ajustar** el
+resultado, y correr sus macros como siempre.
+
 ## Estado (septiembre 2026)
 
-Ya se recibió la **data real de julio** (insumos crudos + matriz diligenciada). Con eso:
+Ya se recibió la **data real de julio** (insumos crudos + matriz diligenciada), lo que
+permite validar el proceso antes de que nadie dependa de él:
 
 - **Mapa de fuentes verificado archivo por archivo** → [`config/fuentes.yaml`](config/fuentes.yaml)
 - **Motor + notebook operativos** → validan el esquema de las 20+ fuentes y reconstruyen
   10 componentes con **~92 % de concordancia** celda a celda contra la matriz de julio.
-- Re-evaluación completa, discrepancias, bloqueos y plan por fases → [`docs/REEVALUACION_2026-09.md`](docs/REEVALUACION_2026-09.md)
+- Re-evaluación, discrepancias, bloqueos y plan por fases → [`docs/REEVALUACION_2026-09.md`](docs/REEVALUACION_2026-09.md)
 
-**Lo que falta** para reproducir el 100 % de la matriz: extractores de 8 bandas
-(1552, ayudas dx, domiciliaria, salud oral, hogares, oxígeno, MOS, planificación familiar),
-3 decisiones de negocio (categorías, REPS de sede, ponderación RS/RC), 4 insumos que no
-llegan por este canal, y el escritor del `.xlsm` (`keep_vba`, celda a celda).
+**Para llegar al objetivo falta:** extractores de 8 bandas (1552, ayudas dx, domiciliaria,
+salud oral, hogares, oxígeno, MOS, planificación familiar), 3 decisiones de negocio
+(categorías, REPS de sede, ponderación RS/RC), 4 insumos que no llegan por este canal, y
+el **escritor del `.xlsm`** (`keep_vba`, celda a celda — fase F8, diseñado en
+[`docs/ARQUITECTURA.md`](docs/ARQUITECTURA.md)).
 
 ---
 
