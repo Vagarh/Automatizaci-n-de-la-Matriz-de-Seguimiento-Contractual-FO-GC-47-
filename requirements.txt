@@ -1,0 +1,11 @@
+# Motor (notebooks/validacion.py, notebooks/catalogo_indicadores.py)
+pandas>=2.2
+openpyxl>=3.1          # lectura de .xlsx/.xlsm (y escritura con keep_vba en la fase F8)
+xlsxwriter>=3.2        # escritura del objeto reporte
+pyyaml>=6.0
+
+# Notebook
+nbformat>=5.10
+nbclient>=0.10
+ipykernel>=6.29
+# jupyterlab       # para abrir el notebook a mano (instalar aparte: pip install jupyterlab)

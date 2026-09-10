@@ -1,0 +1,103 @@
+# =============================================================================
+# Motor de reglas de cumplimiento (declarativo).
+#
+# Se evalúan EN ORDEN. La primera regla cuyo `cuando` sea verdadero define
+# `valor` (celda RESULTADO) y `cumplimiento` (celda CUMPLIMIENTO).
+# Si ninguna especial aplica, se usa `regla_general`.
+#
+# Tokens disponibles en `cuando`:
+#   resultado           valor medido que trae el insumo (número | "NA" | None)
+#   meta                valor de la meta (número | "<=8%" | ">=90%" | "SD" | "NA" | "Reporta")
+#   ips_en_informe      bool  - la IPS aparece en el archivo fuente del componente
+#   aplica_componente   bool  - el contrato pertenece a la categoría/modalidad del componente
+#   num, den            numerador / denominador cuando el insumo los reporta por separado
+#   operador            "<=" | ">=" | "==" | "rango"  (del catálogo indicadores.yaml)
+# =============================================================================
+
+version: 1
+
+reglas:
+
+  - id: no_aplica_componente
+    descripcion: >
+      El contrato no pertenece a la categoría/modalidad del componente
+      (p. ej. un contrato de Evento frente a los indicadores de Oxígeno).
+    cuando: "not aplica_componente"
+    valor: "NA"
+    cumplimiento: "NA"
+
+  - id: reporta_1552_satisfactorio
+    descripcion: >
+      Indicador cabecera "META REPORTA 1552": si la IPS reporta al menos un
+      indicador de la resolución.
+    cuando: "componente == 'resolucion_1552' and indicador == 'meta_reporta_1552' and reporta_al_menos_uno"
+    meta: "Reporta"
+    valor: "Si"
+    cumplimiento: "Satisfactorio"
+
+  - id: meta_SD_cumple_automatico
+    descripcion: >
+      Meta = "SD" (Sin Dato / Sin Definir), típico en 'promedio días estancia'.
+    cuando: "str(meta).strip().upper() == 'SD'"
+    valor: "passthrough"          # se conserva el resultado medido tal cual
+    cumplimiento: "Cumple"
+
+  - id: nota_tecnica_informativa
+    descripcion: >
+      % ejecución nota técnica de la Cápita: indicador informativo, no se pactaron
+      deducciones -> cumplimiento siempre NA.
+    cuando: "indicador == 'nota_tecnica_capita'"
+    valor: "passthrough"
+    cumplimiento: "NA"
+
+  - id: oxigeno_na_num_y_den
+    descripcion: >
+      Regla propia de Oxígeno: si el insumo trae "NA" tanto en numerador como en
+      denominador, el indicador no aplica técnicamente a ese tipo de contrato.
+    cuando: "componente == 'oxigeno' and es_na(num) and es_na(den)"
+    valor: "NA"
+    cumplimiento: "NA"
+
+  - id: ips_midio_NA_sin_casos
+    descripcion: >
+      La IPS SÍ aparece en el informe, pero su medición trae "NA" por no registrar
+      casos / no ejecutar actividades en el periodo. Aplica a: medicina domiciliaria,
+      salud oral, transporte, hogares de paso, oxígeno, MOS, medicamentos, tutelas,
+      PQRSD, planificación familiar, ayudas diagnósticas, extramuralidad, RIAS/PGP.
+    cuando: "ips_en_informe and es_na(resultado)"
+    valor: "NA"
+    cumplimiento: "Cumple"
+
+  - id: ips_ausente_del_informe
+    descripcion: >
+      La IPS NO figura en el informe del mes para un componente que sí le aplica.
+      (Distinto de 'no_aplica_componente'.)
+    cuando: "aplica_componente and not ips_en_informe"
+    valor: "NA"
+    cumplimiento: "NA"
+
+  - id: regla_general
+    descripcion: >
+      Caso normal: se compara el resultado contra el umbral de la meta según el
+      operador del catálogo. Dentro del umbral -> "Cumple"; si no -> "No cumple".
+    cuando: "default"
+    valor: "passthrough"
+    cumplimiento:
+      evaluar:
+        "<=":   "'Cumple' if resultado <= umbral(meta) else 'No cumple'"
+        ">=":   "'Cumple' if resultado >= umbral(meta) else 'No cumple'"
+        "==":   "'Cumple' if resultado == umbral(meta) else 'No cumple'"
+        "rango": "'Cumple' if en_rango(resultado, meta) else 'No cumple'"
+
+# ---------------------------------------------------------------------------
+# Notas de implementación
+# ---------------------------------------------------------------------------
+notas:
+  - "umbral(meta): parsea '<=8%'->0.08, '>=90%'->0.90, '3'->3, '15'->15."
+  - "es_na(x): x in (None, '', 'NA', 'N/A', 'n/a') o NaN."
+  - "passthrough: escribir el resultado con la MAYOR cantidad de decimales posible
+     (el FO-GC-47 lo exige explícitamente para financieros)."
+  - "El motor NUNCA escribe fórmulas: la celda CUMPLIMIENTO queda como texto literal,
+     igual que hoy hace el analista."
+  - "Toda celda escrita queda trazada: (contrato, columna, valor, regla_id, fuente, fila_fuente)
+     -> alimenta validate/control_cambios.py y validate/excepciones.py."

@@ -1,0 +1,93 @@
+# =============================================================================
+# Estructura de la matriz maestra  ·  7.SEGUIMIENTO CONTRACTUAL SAVIA PPAL_<MES>.xlsm
+# Verificado sobre el archivo de JULIO 2026 con openpyxl.
+# El proceso valida esta estructura al inicio de cada corrida y aborta si no cuadra.
+# =============================================================================
+
+libro:
+  # Nombre del archivo del mes anterior que se copia como base (Actividad 1 del FO-GC-47).
+  patron_nombre: "7.SEGUIMIENTO CONTRACTUAL SAVIA PPAL_{MES}.xlsm"
+  ruta_base: 'Z:\10.INDICADORES SEGUIMIENTO CONTRACTUAL\A_SEGUIMIENTO CONTRACTUAL SAVIA\MATRIZ_MES'
+  formato: xlsm
+  preservar_vba: true          # openpyxl load_workbook(keep_vba=True)
+  macros_esperadas:            # solo referencia; el proceso NO las ejecuta
+    - Exportar_Baja_C
+    - Exportar_Baja_E
+    - Exportar_Informe_M        # alias Exportar_Informe_Mediana_Alta
+    - Exportar_Informe_A        # alias Exportar_Informe_Apoyo_DX
+  carpeta_salida_macros: 'D:\Documents\informe'   # debe existir y estar vacía antes de exportar
+
+hoja_datos:
+  nombre: General
+  fila_banda_grupos: 1
+  fila_encabezados: 2
+  fila_datos_inicio: 3
+  total_columnas: 379
+  # Ventana donde el proceso puede ESCRIBIR valores literales (celda a celda).
+  ventana_escritura:
+    col_inicio: A          # 1
+    col_fin: NK            # 375
+  # Columnas con FÓRMULAS vivas de rollup. NUNCA se escriben ni se limpian.
+  columnas_protegidas:
+    - rango: "NL:NO"       # 376..379
+      cols:
+        NL: "TOTAL INDICADORES  (=NM+NN)"
+        NM: 'CUMPLE        (=COUNTIF(A#:NK#,"Cumple"))'
+        NN: 'NO CUMPLE     (=COUNTIF(A#:NK#,"No cumple"))'
+        NO: "CUMPLIMIENTO  (=NM/NL)"
+
+# Llaves / datos generales. La posición ordinal es la que usan los VLOOKUP de las
+# hojas Informe_* (VLOOKUP(B7, General!$A:$AIC, <ordinal>, 0)); si se desplaza, rompe.
+llaves:
+  numero_contrato: {col: A, ordinal: 1}
+  nit:             {col: B, ordinal: 2}
+  reps:            {col: C, ordinal: 3}
+  contratista:     {col: D, ordinal: 4}
+  objeto:          {col: E, ordinal: 5}
+  regimen:         {col: F, ordinal: 6}
+  tipo_red:        {col: G, ordinal: 7}
+  modalidad:       {col: H, ordinal: 8}
+  categoria_contrato: {col: I, ordinal: 9}    # mantenida a mano por el analista — ver equivalencias.yaml
+  subregion:       {col: J, ordinal: 10}
+  municipio:       {col: K, ordinal: 11}
+
+# Bandas de grupo -> rango de columnas (fila 1 de General).
+# Cada indicador dentro de una banda es una tripleta META / RESULTADO / CUMPLIMIENTO.
+# El catálogo columna-por-columna se genera con notebooks/catalogo_indicadores.py
+bandas:
+  DATOS GENERALES:          {desde: A,  hasta: AE}
+  AUDITORÍA CALIDAD:        {desde: AF, hasta: AG}
+  FINANCIEROS:              {desde: AH, hasta: AP}
+  INDICADORES DE ACCESO:    {desde: AQ, hasta: AY}   # nota técnica + autorizaciones
+  CONCURRENCIA:             {desde: AZ, hasta: BE}
+  MIPRES:                   {desde: BF, hasta: BK}
+  MEDICINA DOMICILIARIA:    {desde: BL, hasta: CX}
+  SALUD ORAL:               {desde: CY, hasta: DP}
+  TRANSPORTE ASISTENCIAL:   {desde: DQ, hasta: DV}
+  HOGARES DE PASO:          {desde: DW, hasta: EE}
+  OXÍGENO:                  {desde: EF, hasta: FC}
+  MOS:                      {desde: FD, hasta: FL}
+  MEDICAMENTOS FÉNIX:       {desde: FM, hasta: GA}
+  REPORTE 1552:             {desde: GB, hasta: JA}   # GB/GC/GD = META REPORTA / REPORTA / CUMPL; luego tripletas por CUPS
+  TUTELAS:                  {desde: JB, hasta: JD}
+  PQRSD:                    {desde: JE, hasta: JV}
+  SALUD MENTAL:             {desde: JW, hasta: KB}
+  PLANIFICACIÓN FAMILIAR:   {desde: KC, hasta: LC}
+  AYUDAS DIAGNÓSTICAS:      {desde: LD, hasta: NH}
+  Campañas extramural:      {desde: NI, hasta: NK}
+  TOTALES (protegido):      {desde: NL, hasta: NO}
+
+# Hojas que se copian sin modificar y cuya integridad se verifica (hash) antes/después.
+hojas_preservadas:
+  plantillas_impresion: [Informe_B_C, Informe_B_E, Informe_M, Informe_A, Informe_B_C_2]
+  plantillas_rias_pgp:
+    - OXIGENO, EPOC, Cuello_Uterino, Prostata, Informe_Hemofilia, Informe_HIV,
+      Informe_Mental, "Informe_Mental (2)", Informe_LIANA, Informe_Autoimune,
+      Informe_Conciencia_rosa, Informe_Neurm, Informe_Nefrouros, Informe_Optica_Plazuela,
+      Informe_Visual_Oriente, Informe_Visual_Norte, Informe_Visual_Medellin,
+      Informe_Visual_Total_SUR, Informe_Visual_PGP, Informe_Visual_Evento
+  staging: [Exportar]
+  auxiliares: [Hoja1, Hoja4, Indicadores]
+
+# Vocabulario permitido en las celdas de CUMPLIMIENTO (validado en los datos de julio).
+vocabulario_cumplimiento: [Cumple, "No cumple", NA, Satisfactorio, Reporta, Si, SD]

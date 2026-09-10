@@ -1,0 +1,105 @@
+# =============================================================================
+# Normalización de llaves de texto y tablas de equivalencia.
+# El FO-GC-47 advierte repetidamente: "la sintaxis debe coincidir de forma exacta".
+# =============================================================================
+
+# --- Normalización aplicada SIEMPRE antes de cruzar por texto -----------------
+normalizacion:
+  aplicar_a: [municipio, contratista, nombre_ips, subregion, modalidad, regimen, categoria_contrato]
+  pasos:
+    - trim                       # quitar espacios extremos
+    - colapsar_espacios          # "  " -> " "
+    - mayusculas                 # a MAYÚSCULAS
+    - quitar_tildes              # Á->A, Ñ->N (Ñ configurable, ver preservar_enie)
+    - quitar_puntuacion_final    # "." "," al final
+  preservar_enie: false
+
+# --- Municipios: alias -> nombre canónico (el de la matriz General col K) -----
+# Sembrar desde la lista oficial DIVIPOLA de Antioquia. Ejemplos frecuentes:
+municipios:
+  canonicos_fuente: "DIVIPOLA Antioquia"
+  alias:
+    "MEDELLÍN": "MEDELLIN"
+    "BELLO ": "BELLO"
+    "SAN PEDRO": "SAN PEDRO DE LOS MILAGROS"
+    "SAN PEDRO DE URABA": "SAN PEDRO DE URABÁ"
+    "CIUDAD BOLIVAR": "CIUDAD BOLÍVAR"
+    "EL CARMEN DE VIBORAL": "CARMEN DE VIBORAL"
+    "SANTAFE DE ANTIOQUIA": "SANTA FE DE ANTIOQUIA"
+    "SAN ANDRES DE CUERQUIA": "SAN ANDRÉS DE CUERQUÍA"
+    "SANTA BARBARA": "SANTA BÁRBARA"
+    # ... completar tras el primer reporte de excepciones (municipios_sin_equivalencia)
+
+# --- Nombre de IPS: alias -> nombre canónico --------------------------------
+# Los insumos de programas (domiciliaria, salud oral, transporte...) usan nombres
+# comerciales; la matriz usa la razón social de contratación.
+ips:
+  alias:
+    "COLOMBIA SALUDABLE": "COLOMBIA SALUDABLE IPS SAS"
+    "PREVENTIVA": "PREVENTIVA SALUD SAS"
+    "ACUROTIP": "ACUROTIP SAS"
+    "ODONTOVIDA": "ODONTOVIDA SAS"
+    "IPS SAN JOSE": "IPS SAN JOSE"
+    # ... completar tras 'ips_sin_equivalencia'
+
+# --- Régimen ---------------------------------------------------------------
+regimen:
+  canonico: [SUBSIDIADO, CONTRIBUTIVO, "SUBSIDIADO Y CONTRIBUTIVO"]
+  alias:
+    "RS": SUBSIDIADO
+    "RC": CONTRIBUTIVO
+    "S": SUBSIDIADO
+    "C": CONTRIBUTIVO
+    "SUBSIDIADO-CONTRIBUTIVO": "SUBSIDIADO Y CONTRIBUTIVO"
+    "AMBOS": "SUBSIDIADO Y CONTRIBUTIVO"
+  # prefijos de número de contrato que ya codifican el régimen
+  prefijos_contrato:
+    "RS-": SUBSIDIADO
+    "RC-": CONTRIBUTIVO
+
+# --- Modalidad -----------------------------------------------------------
+modalidad:
+  canonico: [EVENTO, CAPITA, PGP]
+  alias:
+    "CÁPITA": CAPITA
+    "CAPITACION": CAPITA
+    "PAGO GLOBAL PROSPECTIVO": PGP
+
+# --- CATEGORÍA DEL CONTRATO (General col I) ------------------------------
+# BLOQUEO: lista NO confiable en el FO-GC-47. Pedir a Jonatan la lista real.
+# Valores observados en los datos de julio + implícitos en los filtros del instructivo:
+categoria_contrato:
+  pendiente_confirmar_con_jonatan: true
+  valores_observados:
+    - BAJA COMPLEJIDAD
+    - MEDIANA COMPLEJIDAD
+    - "MOS Y AYUDAS ORTOPEDICAS"
+  valores_implicitos_en_filtros:
+    - ATENCION DOMICILIARIA
+    - "Salud Oral"
+    - TRANSPORTE ASISTENCIAL
+    - "Hogares de Paso"
+    - OXIGENO
+  # Mapea cada valor de categoría -> qué componentes de indicadores le aplican.
+  # (imprescindible para la regla `no_aplica_componente`)
+  aplica_componentes: {}   # completar con la lista real
+
+# --- REPS: resolvedor NIT <-> REPS <-> sede ----------------------------
+# El CONSOLIDADO...SIRECI ya trae 1 REPS principal por contrato (suficiente para
+# datos generales). La Resolución 1552 necesita TODAS las sedes.
+reps:
+  fuente_principal:
+    descripcion: "REPS que ya viene en el consolidado (columna 'REPS')"
+    confiable_para: [datos_generales]
+  fuente_sedes:
+    descripcion: "Registro Especial de Prestadores de Servicios de Salud (público)"
+    dataset: "https://www.datos.gov.co/  -> 'Prestadores de Servicios de Salud' (REPS)"
+    portal: "https://prestadores.minsalud.gov.co/habilitacion/"
+    llave_consulta: nit
+    devuelve: [codigo_habilitacion, nombre_sede, municipio_sede, estado]
+    cache_local: "config/reps_cache.parquet"
+    refresco_dias: 30
+  maestra_correcciones:
+    archivo: "config/reps_maestra.csv"
+    columnas: [nit, reps, sede, municipio, vigente_desde, vigente_hasta, nota]
+    proposito: "overrides manuales cuando el REPS público está desactualizado o ambiguo"

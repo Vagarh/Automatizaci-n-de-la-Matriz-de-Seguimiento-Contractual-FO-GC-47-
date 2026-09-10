@@ -1,0 +1,144 @@
+# =============================================================================
+# Catálogo de indicadores -> columnas destino en la hoja General.
+#
+# Cada indicador es una TRIPLETA de columnas:
+#   meta_col          columna de la META  (texto "<=8%", numérico, "SD", "NA", "Reporta")
+#   resultado_col     columna del RESULTADO / INDICADOR / PFAFS
+#   cumplimiento_col  columna del CUMPLIMIENTO  (Cumple / No cumple / NA / Satisfactorio / Si)
+#
+#   operador          cómo se evalúa cumplimiento: "<=", ">=", "==", "rango", "informativo"
+#   meta_origen       "encabezado" (la meta va embebida en el título de fila 2)
+#                     | "fuente"   (la meta viene en el archivo de insumo)
+#                     | "fija:<v>"
+#   regla_vacio       id de regla en config/reglas_cumplimiento.yaml cuando no hay dato
+#
+# El catálogo COMPLETO (100+ tripletas) se genera leyendo la fila 2 de General:
+#     python notebooks/catalogo_indicadores.py --matriz <ruta.xlsm> > config/indicadores.generado.yaml
+# Este archivo fija a mano solo las bandas de lógica no trivial + los rangos de columnas.
+# =============================================================================
+
+_defaults:
+  meta_origen: encabezado
+  regla_vacio: ips_ausente_del_informe    # ver reglas_cumplimiento.yaml
+
+auditoria_calidad:
+  banda: {desde: AF, hasta: AG}
+  campos:
+    cal_fecha_auditoria:  {col: AF}
+    cal_pct_calificacion: {col: AG}
+
+financieros:
+  banda: {desde: AH, hasta: AP}
+  indicadores:
+    glosas:
+      meta_col: AH   # "<=8%"
+      resultado_col: AI
+      cumplimiento_col: AJ
+      operador: "<="
+    devoluciones:
+      meta_col: AK   # "<=2%"
+      resultado_col: AL
+      cumplimiento_col: AM
+      operador: "<="
+    radicacion_180_dias:
+      meta_col: AN   # ">=90%"
+      resultado_col: AO
+      cumplimiento_col: AP
+      operador: ">="
+
+indicadores_de_acceso:
+  banda: {desde: AQ, hasta: AY}
+  indicadores:
+    nota_tecnica_capita:
+      meta_col: AQ
+      resultado_col: AR
+      cumplimiento_col: AS
+      operador: informativo
+      meta_origen: "fija:100"
+      cumplimiento_fijo: NA
+    autorizaciones_tramite:
+      meta_col: AT   # 0.8
+      resultado_col: AU
+      cumplimiento_col: AV
+      operador: ">="
+    autorizaciones_marcacion_efectiva:
+      meta_col: AW   # 0.8
+      resultado_col: AX
+      cumplimiento_col: AY
+      operador: ">="
+
+concurrencia:
+  banda: {desde: AZ, hasta: BE}
+  indicadores:
+    reingresos_atribuibles:
+      meta_col: AZ   # "<= 3%"
+      resultado_col: BA
+      cumplimiento_col: BB
+      operador: "<="
+    dias_estancia_por_evento:
+      meta_col: BC   # a veces "SD"
+      resultado_col: BD
+      cumplimiento_col: BE
+      operador: "<="
+      regla_meta_SD: meta_SD_cumple_automatico
+
+mipres:
+  banda: {desde: BF, hasta: BK}
+  indicadores:
+    entregas_efectivas_direccionamientos:
+      meta_col: BF   # ">=70%"
+      resultado_col: BG
+      cumplimiento_col: BH
+      operador: ">="
+    junta_profesionales_72h:
+      meta_col: BI   # 100%
+      resultado_col: BJ
+      cumplimiento_col: BK
+      operador: ">="
+
+# --- Bandas con muchas tripletas: se listan el rango + patrón; el detalle lo genera el script ---
+medicina_domiciliaria:  {banda: {desde: BL, hasta: CX}, patron: tripleta, meta_origen: fuente}
+salud_oral:             {banda: {desde: CY, hasta: DP}, patron: tripleta, meta_origen: fuente}
+transporte_asistencial: {banda: {desde: DQ, hasta: DV}, patron: tripleta, meta_origen: fuente}
+hogares_de_paso:        {banda: {desde: DW, hasta: EE}, patron: tripleta, meta_origen: fuente}
+oxigeno:                {banda: {desde: EF, hasta: FC}, patron: tripleta, meta_origen: fuente,
+                         regla_vacio: oxigeno_na_num_y_den}
+mos:                    {banda: {desde: FD, hasta: FL}, patron: tripleta, meta_origen: fuente}
+medicamentos:           {banda: {desde: FM, hasta: GA}, patron: tripleta, meta_origen: fuente}
+
+resolucion_1552:
+  banda: {desde: GB, hasta: JA}
+  cabecera:
+    meta_reporta_1552:
+      meta_col: GB
+      resultado_col: GC
+      cumplimiento_col: GD
+      operador: informativo
+      regla: reporta_1552_satisfactorio
+  patron_cups:
+    # a partir de GE: tripletas META/PFAFS/CUMPL por CUPS (el título trae meta + código CUPS)
+    desde: GE
+    forma: [meta, pfafs, cumplimiento]
+    meta_origen: encabezado
+    operador: "<="            # la mayoría son tiempos de espera "<= N días"
+    variable_fuente: PFAFS
+
+tutelas:
+  banda: {desde: JB, hasta: JD}
+  indicadores:
+    tutelas_atribuibles:
+      meta_col: JB
+      resultado_col: JC
+      cumplimiento_col: JD
+      operador: "<="
+      meta_origen: fuente
+
+pqrsd:               {banda: {desde: JE, hasta: JV}, patron: tripleta, meta_origen: fuente}
+salud_mental:        {banda: {desde: JW, hasta: KB}, patron: tripleta, meta_origen: fuente, fuera_de_alcance: true}
+planificacion_familiar: {banda: {desde: KC, hasta: LC}, patron: tripleta, meta_origen: fuente}
+ayudas_diagnosticas: {banda: {desde: LD, hasta: NH}, patron: tripleta, meta_origen: fuente}
+extramuralidad:      {banda: {desde: NI, hasta: NK}, patron: tripleta, meta_origen: fuente}
+
+totales_protegidos:
+  banda: {desde: NL, hasta: NO}
+  escribir: false            # fórmulas vivas — el proceso NO escribe aquí

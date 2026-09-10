@@ -1,0 +1,26 @@
+# Datos y entregables — nunca al repo
+DOCUMENTOS/
+docs/Insumos/
+docs/Objetivo/
+salidas/
+config/*.local.yaml
+config/reps_cache.parquet
+config/reps_maestra.csv
+config/indicadores.generado.yaml
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.pytest_cache/
+.mypy_cache/
+
+# Excel temporales
+~$*.xls*
+
+# IDE / SO
+.vscode/
+.idea/
+Thumbs.db
+"Nueva carpeta (2)/"

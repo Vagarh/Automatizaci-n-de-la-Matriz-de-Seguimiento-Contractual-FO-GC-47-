@@ -1,0 +1,581 @@
+# =============================================================================
+# MAPA DE FUENTES CONFIRMADO CONTRA LOS DATOS REALES DE JULIO 2026
+#
+# Generado en la re-evaluación de 2026-09 (ver docs/REEVALUACION_2026-09.md).
+# Reemplaza en la práctica a config/fuentes.yaml para lo que respecta a
+# "qué archivo / qué hoja / qué fila de encabezado / qué llave".
+#
+# Fuente de la verdad de "qué hojas usar": docs/Insumos/Indicaciones.txt (Jonatan)
+# + verificación abriendo cada archivo de docs/Insumos/ con openpyxl.
+#
+# Campos por componente:
+#   archivo_glob        patrón glob dentro de la carpeta de insumos del mes
+#   carpeta             subcarpeta (para ayudas diagnósticas)
+#   hoja / hojas        hoja(s) exactas a leer  (¡ojo typos reales del archivo!)
+#   fila_encabezado     fila (1-based) donde están los nombres de columna
+#   fila_datos_inicio   primera fila de datos
+#   llave               columna(s) de la fuente que cruzan contra General
+#   llave_matriz        llave equivalente en General
+#   filtro_fila         {columna: valor} para quedarse solo con el mes/periodo
+#   columnas_esperadas  nombres de columna que DEBEN existir (validación de drift)
+#   destino             columnas de General (letra) que alimenta este componente
+#   estado              extraible | parcial | pendiente | falta_insumo | no_aplica | manual
+#   nota                advertencias operativas
+# =============================================================================
+
+meta:
+  mes_referencia: "2026-07"
+  carpeta_insumos: "docs/Insumos"           # copia local de referencia
+  # En operación: unidad compartida. El notebook busca los archivos RECURSIVAMENTE
+  # (los insumos están repartidos en subcarpetas: FINANCIERA, MIPRES, AUTORIZACION, ...).
+  ruta_unidad: 'Z:\10.INDICADORES SEGUIMIENTO CONTRACTUAL'
+  matriz_objetivo: "docs/Objetivo/7.SEGUIMIENTO CONTRACTUAL SAVIA PPAL_JULIO.xlsm"
+  matriz_plantilla_vacia: "docs/Insumos/7.SEGUIMIENTO CONTRACTUAL SAVIA PPAL_JULIO.xlsm"
+  contratos_en_matriz: 657
+  meses_es: [enero, febrero, marzo, abril, mayo, junio, julio, agosto, septiembre, octubre, noviembre, diciembre]
+
+componentes:
+
+  # -------------------------------------------------------------- DATOS GENERALES
+  datos_generales:
+    archivo_glob: "7_CONSOLIDADO FINANCIERA_CONTRATACION_SIRECI*.xlsx"
+    hoja: "SIRECI"
+    fila_encabezado: 1
+    fila_datos_inicio: 2
+    llave: ["NUMERO DE CONTRATO"]
+    llave_matriz: numero_contrato
+    columnas_esperadas:
+      - "NUMERO DE CONTRATO"
+      - "CONTRATISTA : NUMERO DEL NIT"
+      - "REPS"
+      - "REGIMEN"
+      - "CONTRATISTA : NOMBRE COMPLETO"
+      - "OBJETO DEL CONTRATO"
+      - "SUBREGION"
+      - "MUNICIPIO"
+      - "NATURALEZA JURIDICA: RED PUBLICA / PRIVADA"
+      - "MODALIDAD"
+      - "CATEGORIA DEL CONTRATO SEGUIMIENTO A LA RED"
+      - "VALOR INICIAL DEL CONTRATO En pesos"
+      - "ADICIONES : VALOR TOTAL"
+      - "VALOR TOTAL INCLUIDA ADICION  En pesos"
+      - "PLAZO INICIAL DEL CONTRATO En dIas"
+      - "TIEMPO TOTAL SOLO PRORROGAS  En dIas"
+      - "TIEMPO TOTAL INCLUIDA PRORROGA  En dIas"
+      - "FECHA INICIO CONTRATO"
+      - "FECHA TERMINACION CONTRATO"
+      - "CORTE SIRECI"
+      - "TOTAL FACTURACION ACUMULADA"
+      - "PORCENTAJE AVANCE PRESUPUESTAL PROGRAMADO"
+      - "PORCENTAJE AVANCE PRESUPUESTAL REAL"
+      - "%  SOBREEJECUCION / SUBEJECUCION"
+      - "ESTADO DE LEGALIZACION"
+    destino: "A:AE"
+    estado: parcial
+    nota:
+      - "658 filas reales (657 contratos). El resto de la hoja (hasta 1048548) está vacío/formateado."
+      - "La hoja SIRECI_JUNIO es el mes anterior; NO usarla."
+      - "Migración directa por número de contrato; no hay lógica de cumplimiento aquí."
+      - "Columnas Z(desde)/AA(hasta)/AB(valor) y AC/AD/AE de pólizas en General: origen = columnas AN..AS del SIRECI."
+
+  contratos_complemento:
+    archivo_glob: "Contratos.xlsm"
+    hoja: "BD CONTRATOS 2019-2026"
+    fila_encabezado: 3
+    fila_datos_inicio: 4
+    llave: ["NÚMERO DE CONTRATO"]
+    llave_matriz: numero_contrato
+    columnas_esperadas: ["AÑO DE SUSCRIPCIÓN", "NÚMERO DE CONTRATO", "MODALIDAD", "RÉGIMEN",
+                         "NIVEL DE COMPLEJIDAD", "MUNICIPIO", "FECHA TERMINACIÓN CONTRATO",
+                         "VALOR TOTAL INCLUIDA ADICIÓN  (En pesos)", "TIEMPO TOTAL SOLO PRÓRROGAS",
+                         "ESTADO DEL CONTRATO"]
+    destino: "complementa datos_generales"
+    estado: parcial
+    nota:
+      - "3583 filas. Hoja de contratación viva; aporta vigencia/prórrogas/nivel de complejidad."
+      - "264 columnas: la banda 'INFORME <MES> <AÑO>' (FM..JC) sirve para validar contratos vencidos."
+
+  # -------------------------------------------------------------- AUDITORÍA CALIDAD
+  auditoria_calidad:
+    archivo_glob: "AUDITORIA DE CALIDAD_MATRIZ_Act_*.xlsx"
+    hoja: "Indicador"
+    fila_encabezado: 1
+    fila_datos_inicio: 2
+    llave: ["NIT"]
+    llave_matriz: nit
+    columnas_esperadas: ["NIT", "CONTRATISTA", "FECHA", "RESULTADO"]
+    destino: {AF: "FECHA", AG: "RESULTADO"}
+    estado: extraible
+    nota:
+      - "Indicaciones.txt manda la hoja 'Indicador' (4 columnas), NO la hoja 'Consolidado' (35 columnas)."
+      - "FECHA y RESULTADO pueden venir como texto 'NA'."
+      - "268 filas. Cruce por NIT exacto."
+
+  # -------------------------------------------------------------- FINANCIEROS
+  financieros_evento:
+    archivo_glob: "9.Consolidado indicadores por IPS *.xlsx"
+    hoja: "2026"
+    fila_encabezado: 1
+    fila_datos_inicio: 2
+    llave: ["NIT_IPS", "Regimen"]
+    llave_matriz: [nit, regimen]
+    filtro_fila: {Periodo: "{MES_NOMBRE_CAP}"}   # "Julio" (capitalizado, como viene en el archivo)
+    columnas_esperadas:
+      - "NIT_IPS"
+      - "Razon_Social_Prestador"
+      - "Periodo"
+      - "Regimen"
+      - "Indicador glosa"
+      - "Meta glosas"
+      - "Cumplimiento glosa"
+      - "Indicador devoluciones"
+      - "Meta devoluciones"
+      - "Cumplimiento Devoluciones"
+      - "Indicador radicación ≤ 180 días"
+      - "Meta"
+      - "Cumplimiento"
+    destino:
+      AH: "Meta glosas"
+      AI: "Indicador glosa"
+      AJ: "Cumplimiento glosa"
+      AK: "Meta devoluciones"
+      AL: "Indicador devoluciones"
+      AM: "Cumplimiento Devoluciones"
+      AN: "Meta"                       # ≥90%
+      AO: "Indicador radicación ≤ 180 días"
+      AP: "Cumplimiento"
+    estado: extraible
+    nota:
+      - "El archivo trae 2022..2026 en hojas separadas; usar SOLO la hoja del año en curso."
+      - "4666 filas (año completo). Filtrar Periodo == mes en curso."
+      - "El propio archivo ya trae Meta y Cumplimiento por indicador -> se pueden copiar tal cual y usarlos para validar el motor de reglas."
+      - "Un NIT puede tener 2 filas (SUBSIDIADO / CONTRIBUTIVO). Si el contrato es 'SUBSIDIADO Y CONTRIBUTIVO' -> ponderar (regla de negocio pendiente, ver docs)."
+      - "A Cápita y PGP NO les aplican estos indicadores (van NA); el archivo es de Evento."
+
+  financieros_capita:
+    archivo_glob: "INFORME CAPITA Y MOVILIDAD*.xlsx"
+    hoja: null
+    llave: ["MUNICIPIO"]
+    llave_matriz: municipio
+    destino: "AH:AP (solo valor_avalado_pago; resto NA)"
+    estado: falta_insumo
+    nota:
+      - "NO está en docs/Insumos. Indicaciones.txt no lo menciona; el FO-GC-47 sí."
+      - "Confirmar con Jonatan si Cápita se diligencia desde 'Tablero de Seguimiento Ejecucion Capitas' o desde este archivo."
+
+  financieros_pgp:
+    archivo_glob: null
+    fuente: "Google Sheets - Matriz de Seguimiento PGP"
+    llave: ["numero_contrato"]
+    estado: falta_insumo
+    nota: ["Requiere acceso al Drive. No provisto."]
+
+  # -------------------------------------------------------------- INDICADORES DE ACCESO
+  nota_tecnica_capita:
+    archivo_glob: "Tablero de Seguimiento Ejecucion Capitas*.xlsx"
+    hoja: "resumen"
+    llave: ["modalidad", "municipio"]
+    destino: {AQ: "meta fija 100", AR: "% ejecución nota técnica", AS: "NA (informativo)"}
+    estado: falta_insumo
+    nota:
+      - "Indicaciones.txt lo lista para INDICADORES DE ACCESO pero el archivo NO está en docs/Insumos."
+      - "Cumplimiento (AS) siempre NA. Meta (AQ) fija 100%."
+
+  autorizaciones_tramite:
+    archivo_glob: "Trámite interno *.xlsx"
+    hoja: "{MES_NOMBRE_CAP}"          # "Julio"
+    fila_encabezado: 2
+    fila_datos_inicio: 3
+    llave: ["NIT_PRESTADOR_SOLICITA", "MUNICIPIO_PRESTADOR_SOLICITA"]
+    llave_matriz: [nit, municipio]
+    columnas_esperadas:
+      - "NIT_PRESTADOR_SOLICITA"
+      - "RAZON_SOCIAL_PRESTADOR_SOLICITA"
+      - "MUNICIPIO_PRESTADOR_SOLICITA"
+      - "% TRÁMITE"                   # aparece 3 veces: SUBSIDIADO(G) / CONTRIBUTIVO(K) / TOTAL(O)
+    destino: {AT: "META 0.8", AU: "% TRÁMITE (según régimen)", AV: "cumplimiento >="}
+    estado: extraible
+    nota:
+      - "Encabezado en 2 filas: f1 agrupa SUBSIDIADO/CONTRIBUTIVO/TOTAL, f2 los sub-encabezados."
+      - "Una hoja por mes ('Enero'..'Julio'). Leer la del mes en curso."
+      - "Régimen del contrato -> elegir el % TRÁMITE de la banda correspondiente (G subsidiado, K contributivo, O total)."
+
+  autorizaciones_marcacion:
+    archivo_glob: "Marcación prestación efectiva *.xlsx"
+    hoja: "{MES_NOMBRE_CAP}"
+    fila_encabezado: 2
+    fila_datos_inicio: 3
+    llave: ["NIT_PRESTADOR_AUTORIZA", "MUNICIPIO_PRESTADOR_AUTORIZA"]
+    llave_matriz: [nit, municipio]
+    columnas_esperadas:
+      - "NIT_PRESTADOR_AUTORIZA"
+      - "RAZON_SOCIAL_PRESTADOR_AUTORIZA"
+      - "MUNICIPIO_PRESTADOR_AUTORIZA"
+      - "% FECHA PRESTACIÓN"          # SUBSIDIADO(F) / CONTRIBUTIVO(I) / TOTAL(L)
+    destino: {AW: "META 0.8", AX: "% FECHA PRESTACIÓN (según régimen)", AY: "cumplimiento >="}
+    estado: extraible
+    nota: ["Misma estructura de doble encabezado que Trámite interno."]
+
+  # -------------------------------------------------------------- CONCURRENCIA
+  concurrencia:
+    archivo_glob: "Indicadores_Hospitalarios_*.xlsx"
+    hojas: ["IPS_Sin_Concurrencia", "IPS_Concurrencia_CONEXIONBES"]   # OJO: el archivo trae 'CONEXIONBES' (typo real), Indicaciones.txt dice 'CONEXIONES'
+    fila_encabezado: 2
+    fila_datos_inicio: 3
+    llave: ["NIT"]
+    llave_matriz: nit
+    columnas_esperadas:
+      - "MES"
+      - "REPS"
+      - "NIT"
+      - "NÚMERO DE CONTRATO"
+      - "PRESTADOR"
+      - "META  PROPORCION REINGRESOS ANTES DE 15 DIAS"
+      - "INDICADOR  PROPORCION REINGRESOS ANTES DE 15 DIAS"
+      - "META   PROMEDIO DIAS ESTANCIA POR EVENTO"
+      - "INDICADOR  PROMEDIO DIAS ESTANCIA POR EVENTO"
+    destino:
+      AZ: "META  PROPORCION REINGRESOS ANTES DE 15 DIAS"
+      BA: "INDICADOR  PROPORCION REINGRESOS ANTES DE 15 DIAS"
+      BB: "cumplimiento <="
+      BC: "META   PROMEDIO DIAS ESTANCIA POR EVENTO"
+      BD: "INDICADOR  PROMEDIO DIAS ESTANCIA POR EVENTO"
+      BE: "cumplimiento <="
+    estado: extraible
+    nota:
+      - "Unificar las 2 hojas (con y sin auditoría concurrente). En la hoja CONEXIONBES las columnas L y M están INVERTIDAS (L=DENOMINADOR, M=NUMERADOR)."
+      - "Meta o resultado 'SD' -> cumplimiento 'Cumple' automático (regla meta_SD)."
+      - "Un contrato/NIT puede traer varios números de contrato concatenados en la columna D."
+
+  # -------------------------------------------------------------- MIPRES
+  mipres_entregas:
+    archivo_glob: "8. Entregas Efectivas *.xlsx"
+    hoja: "Dinamica"
+    fila_encabezado: 5              # tabla dinámica: f3 'Regimen_paciente', f4 régimen, f5 Numerador/Denominador
+    fila_datos_inicio: 6
+    llave: ["Nit_del_proveedor"]
+    llave_matriz: nit
+    columnas_esperadas: ["Nit_del_proveedor", "Nombre_del_proveedor", "Numerador", "Denominador"]
+    destino: {BF: "META 70%", BG: "Numerador/Denominador (entregas efectivas)", BH: "cumplimiento >="}
+    estado: extraible
+    nota:
+      - "Es una tabla dinámica: columnas C..H = Numerador/Denominador por régimen (CONTRIBUTIVO, SUBSIDIADO, en blanco)."
+      - "Resultado = sum(Numerador) / sum(Denominador) para el régimen del contrato (o total)."
+      - "Un NIT aparece en varias filas (sedes) -> agregar."
+
+  mipres_juntas:
+    archivo_glob: "8.Cumplimiento Junta de profesionales *.xlsx"
+    hoja: "Dinamica"
+    fila_encabezado: 3
+    fila_datos_inicio: 4
+    llave: ["n_identificacion_ips"]
+    llave_matriz: nit
+    columnas_esperadas: ["n_identificacion_ips", "nombre_entidad_prescriptora", "Numerador", "Denominador", "Diferencia"]
+    destino: {BI: "META 100%", BJ: "Numerador/Denominador (juntas 72h)", BK: "cumplimiento >="}
+    estado: extraible
+    nota: ["f1 'regimen (Todas)'. Resultado = Numerador/Denominador."]
+
+  # -------------------------------------------------------------- MEDICINA DOMICILIARIA
+  medicina_domiciliaria:
+    archivos:
+      atencion:
+        archivo_glob: "INDICADORES ATENCION DOMICILIARIA *.xlsx"
+        hojas: "*"                  # una hoja por contrato: 'Preventiva 0351-2025', 'Colombia Saludable 0079-2025', ...
+        fila_encabezado: 1
+        llave_hoja_a_contrato: true # el nº de contrato va en el nombre de la hoja y en la columna D
+      curativa:
+        archivo_glob: "Indicadores Curativ *.xlsx"
+        hojas: "*"                  # 'CONTRATO 0227 2024', 'CONTRATO 0429 2025' (Indicaciones.txt decía '0426 2025' - INCORRECTO)
+        fila_encabezado: 1
+    filtro_fila: {MES: "{MES_NOMBRE_UP}"}   # 'JULIO'
+    llave: ["NÚMERO DE CONTRATO"]
+    llave_matriz: numero_contrato
+    filtro_categoria: "ATENCION DOMICILIARIA"
+    columnas_esperadas: ["MES", "REPS", "NIT", "NÚMERO DE CONTRATO", "PRESTADOR", "META"]
+    destino: "BL:CX  (7 indicadores 'atención domiciliaria' + 6 'clínica de heridas / curativa')"
+    estado: pendiente
+    nota:
+      - "Layout por bloques: cada hoja trae 12 meses en filas + un separador de año ('E=2026' en col E)."
+      - "El patrón META/INDICADOR está INTERCALADO y varía entre 'atención' (F=indicador,G=meta) y 'curativa'."
+      - "En General el orden es INDICADOR luego CUMPLIMIENTO pero la fuente pone INDICADOR luego META; mapear con cuidado."
+      - "Contrato con sufijo de año que cambia ('0351-2025' -> '0351-2026' en julio): normalizar el número base."
+
+  # -------------------------------------------------------------- SALUD ORAL
+  salud_oral:
+    archivo_glob: "INDICADORES ODONTOLOGICOS IPS SAN JOSE *.xlsx"
+    hoja: "JULIO"
+    fila_encabezado: 1
+    fila_datos_inicio: 2
+    llave: ["NÚMERO DE CONTRATO"]
+    llave_matriz: numero_contrato
+    filtro_categoria: "Salud Oral"
+    columnas_esperadas: ["MES", "REPS", "NIT", "NÚMERO DE CONTRATO", "PRESTADOR",
+                         "META 1 Oportunidad para consulta de primera vez por  Endodoncia"]
+    destino: "CY:DP  (6 indicadores odontológicos)"
+    estado: pendiente
+    nota:
+      - "Solo 1 fila de datos en julio (contrato 04449-2025, IPS San Jose). Metas tipo '<=10', '<= 15'."
+      - "Indicaciones.txt: para julio SOLO hubo San Jose (no ODONTOVIDA)."
+      - "Hay una hoja 'Hoja1' (B2:K22) que parece plantilla de metas — ignorar."
+
+  # -------------------------------------------------------------- TRANSPORTE
+  transporte_asistencial:
+    archivo_glob: "*Indicador Transporte Asistencia*.xlsx"
+    hoja: "Indicadores_Contratos_Evento"   # Indicaciones.txt dice 'Indicaddores_...' (typo)
+    fila_encabezado: 1
+    fila_datos_inicio: 2
+    llave: ["NÚMERO DE CONTRATO"]
+    llave_matriz: numero_contrato
+    filtro_categoria: "TRANSPORTE ASISTENCIAL"
+    columnas_esperadas:
+      - "MES"
+      - "NIT"
+      - "NÚMERO DE CONTRATO"
+      - "PRESTADOR"
+      - "META"
+      - "INDICADOR Proporción de traslados asistenciales efectivos"
+      - "INDICADOR Cumplimiento Tiempo Promesa de Servicio (Minutos)"
+    destino:
+      DQ: "META (≥90%)"
+      DR: "INDICADOR Proporción de traslados asistenciales efectivos"
+      DS: "cumplimiento >="
+      DT: "META (≤15 min)"
+      DU: "INDICADOR Cumplimiento Tiempo Promesa de Servicio (Minutos)"
+      DV: "cumplimiento <="
+    estado: extraible
+    nota: ["4 contratos en julio. Metas y resultados vienen en la fuente."]
+
+  # -------------------------------------------------------------- HOGARES DE PASO
+  hogares_de_paso:
+    archivo_glob: "INDICADORES HOGARES DE PASO *.xlsx"
+    hojas: ["SUBSIDIADO", "CONTRIBUTIVO"]
+    fila_encabezado: null            # NO es tabular
+    llave: ["PROVEEDOR"]             # 'CASA DEL BUEN DIOS', 'SANTA TERESITA'
+    llave_matriz: contratista
+    filtro_categoria: "Hogares de Paso"
+    destino: "DW:EE  (3 indicadores)"
+    estado: pendiente
+    nota:
+      - "Layout por BLOQUES verticales: encabezado de ficha (f4), luego 3 mini-tablas PROVEEDOR/MES/INDICADOR/NUMERADOR/DENOMINADOR/RESULTADO (f11, f16, f21)."
+      - "Cada bloque = un indicador (RS-IND-88, 89, 90). Meta en f6..f8 col I (1, 1, ≤4)."
+      - "Cruce por nombre de proveedor -> requiere diccionario de alias contra 'contratista' de General."
+      - "También hay hoja '0530-2025' (otro contrato)."
+
+  # -------------------------------------------------------------- OXÍGENO
+  oxigeno:
+    archivo_glob: "INDICADOR PROGRAMA GESTION OXIGENO*.xlsx"
+    hoja: "Hoja1"
+    fila_encabezado: null            # 2 bloques
+    llave: ["NÚMERO DE CONTRATO"]
+    llave_matriz: numero_contrato
+    filtro_categoria: "OXIGENO"
+    bloques:
+      evento: {titulo_fila: 1, encabezado_fila: 2, datos: "3..7", indicadores: 5}
+      pgp:    {titulo_fila: 8, encabezado_fila: 9, datos: "10..12", indicadores: 7}
+    destino: "EF:FC  (equipos recolectados + cumplimiento + oportunidades por zona + eventos adversos + fórmulas vencidas)"
+    estado: pendiente
+    nota:
+      - "Bloque EVENTO (contratos 0411-2025, RC/RS-0390/0391-2026, 0596-2025) y bloque PGP (0523/0542/0570-2025)."
+      - "Muchísimo 'N/A' por zona geográfica -> regla oxigeno_na_num_y_den (NA en valor Y cumplimiento)."
+      - "Metas tipo '≤ 8 Horas', '≤ 48 horas', '>95 %', '>80%' embebidas en celdas de datos, no en encabezado."
+
+  # -------------------------------------------------------------- MOS
+  mos:
+    archivo_glob: "REPORTE DE INDICADORES MOS Y AOM*.xlsx"
+    hoja: "Hoja1"
+    fila_encabezado: 1
+    fila_datos_inicio: 2
+    llave: ["NUMERO DE CONTRATO"]
+    llave_matriz: numero_contrato
+    filtro_fila: {MES: "ultimo"}     # trae histórico desde 2022; quedarse con el corte más reciente por contrato
+    filtro_categoria: "MOS Y AYUDAS ORTOPEDICAS"
+    columnas_esperadas:
+      - "MES"
+      - "NIT"
+      - "NUMERO DE CONTRATO"
+      - "PROVEEDOR"
+      - "META INDICADOR PQRD"
+      - "INDICADOR PQRD"
+      - "META INDICADOR CANCELACION CX"
+      - "INDICADOR CANCELACION CX"
+      - "META INDICADOR OPORTUNIDAD ENTREGA"
+      - "INDICADOR OPORTUNIDAD ENTREGA"
+      - "META INDICADOR EVENTOS ADVERSOS"
+      - "INDICADOR EVENTOS ADVERSOS"
+    destino: "FD:FL  (3 indicadores en General: cancelación cx / oportunidad entrega / eventos adversos-fallas)"
+    estado: pendiente
+    nota:
+      - "687 filas con histórico 2022+. Filtrar por el corte del mes en curso."
+      - "Valores 'SR' (sin reporte), 'CR', 'N/A' frecuentes. NIT con sufijo '-1'."
+      - "La fuente trae 6 indicadores; General (banda MOS FD:FL) usa 3. Confirmar el mapeo exacto con Jonatan."
+
+  # -------------------------------------------------------------- MEDICAMENTOS FÉNIX
+  medicamentos:
+    archivo_glob: "FO-RS-96*.xlsx"
+    hoja: "FO-RS-96 Supervisión"
+    fila_encabezado: 6
+    fila_datos_inicio: 7
+    llave: ["NÚMERO DE CONTRATO"]
+    llave_matriz: numero_contrato
+    validar_vigencia: true
+    columnas_esperadas:
+      - "NIT"
+      - "NÚMERO DE CONTRATO"
+      - "REPS"
+      - "INSTITUCIÓN"
+      - "SUBREGIÓN"
+      - "MUNICIPIO"
+      - "Mes Reportado"
+      - "A14 - META: Promedio de tiempo de espera para la entrega de medicamentos incluidos en el PBS"
+      - "A14 - Resultado: Promedio de tiempo de espera para la entrega de medicamentos incluidos en el PBS"
+      - "A15 - META: Porcentaje  de fórmulas médicas entregadas de manera completa"
+      - "A15 - Resultado: Porcentaje  de fórmulas médicas entregadas de manera completa"
+      - "A16 - META: Porcentaje de fórmulas médicas entregadas de manera oportuna"
+      - "A16 - Resultado: Porcentaje de fórmulas médicas entregadas de manera oportuna"
+      - "A17 - META: Porcentaje de faltantes entregados en un lapso no mayor a 48 horas"
+      - "A17 - Resultado: Porcentaje de faltantes entregados en un lapso no mayor a 48 horas"
+      - "Cumple / No Cumple"
+    destino: "FM:GA  (5 indicadores A14..A17 + oportunidad faltantes)"
+    estado: extraible
+    nota:
+      - "261 filas de datos. 'Mes Reportado' puede traer texto largo ('NO REPORTA INDICADOR PORQUE...') -> tratar como no-reporte."
+      - "Metas como texto: '2 DÍAS', '48 HORAS'. Resultados como 'N/A' o número."
+      - "La fuente trae 'Cumple / No Cumple' (col AB) -> usar para validar el motor de reglas."
+
+  # -------------------------------------------------------------- RESOLUCIÓN 1552
+  resolucion_1552:
+    archivo_glob: "*CONSOLIDADO_R1552*.xlsx"
+    hoja: "CONSOLIDADO"
+    fila_encabezado: 17
+    fila_datos_inicio: 18
+    llave: ["CÓDIGO HABILITACIÓN IPS", "CUPS"]
+    llave_matriz: [reps, cups]
+    valor: "PFAFS"
+    metas:
+      hoja: "METAS"
+      fila_encabezado: 1
+      llave: "CUPS"                  # col B
+      columna_meta: "META en días"  # col F
+    columnas_esperadas:
+      - "MES"
+      - "MUNICIPIO"
+      - "NIT IPS"
+      - "CÓDIGO HABILITACIÓN IPS"
+      - "RAZÓN SOCIAL"
+      - "CUPS"
+      - "TOTAL CITAS ASIGNADAS"
+      - "PFAFS"
+    destino:
+      GB: "META REPORTA 1552 -> 'Reporta'"
+      GC: "REPORTA -> 'Si'"
+      GD: "CUMPLIMIENTO -> 'Satisfactorio' si reporta >=1"
+      "GE..JA": "tripletas META/PFAFS/CUMPL por CUPS (ver encabezados de General: 890201, 890203, 890283, 890266, 890250O, 890235, 815103, 130003, 890208, 361605, 890246, 890247, 890294, 890273, 890280, 890228, 890244, 890275, 890281, 890250G, 890240, ayuda dx, 890243, 890242, psiquiatría 890284)"
+    estado: pendiente
+    nota:
+      - "1276 filas. Encabezado REAL en la fila 17 (las 16 primeras son el membrete del formato FO-RS-90 y el glosario de siglas)."
+      - "Cruce por CÓDIGO HABILITACIÓN IPS (12 díg, = REPS de sede) + CUPS. NUNCA por NIT."
+      - "Un contrato -> N sedes -> N códigos de habilitación. Necesita resolvedor NIT<->REPS<->sede (bloqueo abierto)."
+      - "La hoja METAS mapea CUPS -> meta en días. Las metas también están embebidas en los encabezados de General (GE, GH, GK...)."
+      - "Si un contrato reporta >=1 CUPS: GB='Reporta', GC='Si', GD='Satisfactorio'."
+
+  # -------------------------------------------------------------- TUTELAS
+  tutelas:
+    archivo_glob: "Base de Servicios de tutelas *.xlsx"
+    hoja: "Detallado"
+    fila_encabezado: 1
+    fila_datos_inicio: 2
+    llave: ["Contrato"]
+    llave_matriz: numero_contrato
+    columnas_esperadas: ["Contrato", "IPS", "NIT", "Requerimiento", "Tutela Nueva", "Total general", "Indicador"]
+    destino: {JB: "META", JC: "Indicador (razón de tutelas)", JD: "cumplimiento <="}
+    estado: extraible
+    nota:
+      - "178 filas. 'Indicador' ya viene calculado (razón muy pequeña, ~1e-6)."
+      - "Contrato con prefijo de régimen: 'RS-0603-2026', 'RC-...'. Normalizar contra General (que usa el mismo prefijo)."
+      - "Meta no viene en 'Detallado'; está en la hoja 'Indicador' (BJ..) o en el encabezado de General."
+
+  # -------------------------------------------------------------- PQRSD
+  pqrsd:
+    archivo_glob: null
+    fuente: "Google Sheets - RESULTADOS CONTRACTUALES INDICADORES PQRSD 2026"
+    url: "https://docs.google.com/spreadsheets/d/1O1LW-Idmn-hkZyqXyySmIbJ9eKMxCkYWxxhASs3xgXg/edit?gid=1200762292"
+    hojas: ["PQ RIESGO V 12H (2025)", "PQ PRIORIZADAS  24H (2025)", "PQ SIMPLE 36H (2025)",
+            "PQ RIESGO V 18H (2026)", "PQ PRIORIZADAS  36H (2026)", "PQ SIMPLE 48H (2026)"]
+    llave: ["numero_contrato"]
+    destino: "JE:JV"
+    estado: falta_insumo
+    nota: ["Requiere acceso al Drive. No provisto. Validar ausencias con Atención al Usuario."]
+
+  # -------------------------------------------------------------- SALUD MENTAL
+  salud_mental:
+    estado: no_aplica
+    destino: "JW:KB"
+    nota: ["Indicaciones.txt: 'Ya no mandan indicadores, se deja todo NA'."]
+
+  # -------------------------------------------------------------- PLANIFICACIÓN FAMILIAR
+  planificacion_familiar:
+    archivos:
+      expertasalud:
+        archivo_glob: "INDICADORES IPS EXPERTASALUD *.xlsx"
+        hoja: "RESULTADO INDICADORES 2025"
+        fila_encabezado: 2            # f1 '1. INDICADOR', f2 'INDICADOR 1: ...'/'META'/'NUMERADOR'/'DENOMINADOR'
+        llave: ["NÚMERO DE CONTRATO"]
+      salud_reproductiva:
+        archivo_glob: "INDICADORES IPS SALUD REPRODUCTIVA *.xlsx"
+        hoja: "Indicadores contrato 2025"
+        fila_encabezado: 2            # (aquí f1 es un título; encabezados en f2, sub-encabezados en f3)
+        llave: ["NÚMERO DE CONTRATO"]
+    filtro_fila: {"MES DE REPORTE": "{MES_NOMBRE_UP}"}   # 'JULIO'
+    llave_matriz: numero_contrato
+    filtro_categoria: null           # CORRECCIÓN: el FO-GC-47 decía 'MOS y ayudas ortopédicas' (error)
+    destino: "KC:LC  (8-9 indicadores)"
+    estado: pendiente
+    nota:
+      - "Contratos: 0217-2022 (Expertasalud / IPS AMBULATORIA DE COLOMBIA) y 0443-2025 (Salud Reproductiva SAS)."
+      - "Layout ancho: bloques de 4 columnas por indicador (INDICADOR n / META / NUMERADOR / DENOMINADOR)."
+      - "Filtrar la fila del mes en curso ('MES DE REPORTE'). Filas futuras traen #DIV/0!."
+      - "Expertasalud: 8 indicadores. Salud Reproductiva: 9. General mapea las tripletas KC..LC."
+
+  # -------------------------------------------------------------- AYUDAS DIAGNÓSTICAS
+  ayudas_diagnosticas:
+    carpeta: "Reporte Ayudas DX"
+    archivo_glob: "*"
+    llave: ["numero_contrato", "nombre_ips"]
+    llave_matriz: [numero_contrato, contratista]
+    destino: "LD:NH  (banda más grande de la matriz)"
+    estado: manual
+    nota:
+      - "23 archivos, uno por prestador, con estructuras TOTALMENTE distintas entre sí:"
+      - "  - varios con hoja 'DETALLE_1552_Art_2' (41..65 columnas, miles de filas de detalle CUPS)"
+      - "  - otros con hojas ad-hoc: 'INDICADORES 2026', 'IMAGENES', 'Mamografias', 'INDICADORES UVDXM', 'RS-0427-2026'..."
+      - "  - 1 archivo .xls legacy ('Oportunidad Savia IMECO.xls') -> requiere xlrd o conversión."
+      - "Indicaciones.txt: 'son los más complejos, hay prestadores con 1 indicador y otros con 5 o más'."
+      - "Si un prestador no envía a la fecha de impresión -> se deja sin medición."
+      - "Automatización realista: un parser por FAMILIA de plantilla, no uno por archivo. Fase posterior."
+
+  # -------------------------------------------------------------- CAMPAÑAS EXTRAMURAL
+  extramuralidad:
+    archivo_glob: "Formato de indicadores extramuralidad *.xlsx"
+    hoja: "JULIO"
+    fila_encabezado: 1
+    fila_datos_inicio: 2
+    llave: ["MUNICIPIO"]
+    llave_matriz: municipio
+    aplica_si: {complejidad: ["BAJA COMPLEJIDAD"], modalidad: ["CAPITA", "CÁPITA"]}
+    columnas_esperadas:
+      - "MES"
+      - "MUNICIPIO"
+      - "META INDICADOR"
+      - "RESULTADO DEL INDICADOR"
+      - "NUMERADOR (Número de personas atendidas en extramuralidad)"
+      - "DENOMINADOR (Número total de personas proyectadas en el periodo)"
+    destino: {NI: "META INDICADOR", NJ: "RESULTADO DEL INDICADOR", NK: "cumplimiento >="}
+    estado: extraible
+    nota:
+      - "98 municipios. RESULTADO puede venir '#N/A' (numerador #N/A) -> NA."
+      - "Cruce por municipio (texto) -> normalizar. Solo aplica a contratos Baja Complejidad + Cápita."
+
+# -----------------------------------------------------------------------------
+# TOTALES (columnas NL:NO de General) -> fórmulas vivas. NUNCA se escriben.
+#   NL =NM+NN | NM =COUNTIF(A#:NK#,"Cumple") | NN =COUNTIF(A#:NK#,"No cumple") | NO =NM/NL
+# -----------------------------------------------------------------------------
