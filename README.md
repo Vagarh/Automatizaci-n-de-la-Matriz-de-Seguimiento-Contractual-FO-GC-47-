@@ -48,22 +48,23 @@ negocio (categorías, REPS de sede, ponderación RS/RC) y 4 insumos que no llega
 **Requisitos:** Python 3.11+, `pip install -r requirements.txt`, y acceso al disco compartido.
 
 1. Conectar la unidad compartida (`Z:` o la que sea).
-2. Abrir **`notebooks/01_validacion_fuentes_y_concordancia.ipynb`** y ajustar el bloque de
-   parámetros:
+2. Abrir **`notebooks/01_validacion_fuentes_y_concordancia.ipynb`** y editar **solo** la
+   celda **①  Parámetros**:
 
    ```python
-   MES         = "2026-08"                                  # AAAA-MM del cierre
-   RUTA_UNIDAD = r"Z:\10.INDICADORES SEGUIMIENTO CONTRACTUAL"  # raíz del disco compartido
-   SUBCARPETA  = ""                                         # subcarpeta del mes, si aplica
-   MATRIZ_OBJETIVO = ...                                    # .xlsm de referencia (opcional)
+   MES          = "2026-09"                                    # mes que se cierra
+   RUTA_FUENTES = r"Z:\10.INDICADORES SEGUIMIENTO CONTRACTUAL" # carpeta de insumos (búsqueda recursiva)
+   SUBCARPETA   = ""                                           # subcarpeta del mes, si aplica
+   PLANTILLA    = r"...\7.SEGUIMIENTO...AGOSTO.xlsm"           # la matriz del MES ANTERIOR
+   MATRIZ_REFERENCIA = ""                                      # .xlsm ya diligenciado para comparar (opcional)
+   DIR_SALIDA   = ""                                           # dónde dejar resultados; "" = <proyecto>\salidas\<MES>
    ```
 
-   Los insumos se buscan **recursivamente** en todas las subcarpetas — no hay que listar
-   cada ruta. Si la unidad no está conectada, cae a `docs/Insumos/` y avisa.
-3. Ejecutar el notebook. Produce dos cosas:
-   - **`salidas/validacion/<fecha>/reporte_validacion.xlsx`** — validación de fuentes + concordancia.
-   - **`salidas/<mes>/7.SEGUIMIENTO CONTRACTUAL SAVIA PPAL_<MES>.xlsm`** — la matriz diligenciada
-     (bandas con extractor) + **`reporte_llenado.xlsx`** de control.
+   Los insumos se buscan **recursivamente** en todas las subcarpetas. Si una ruta no
+   existe, el notebook cae a la copia local y avisa.
+3. **Run → Run All Cells.** Deja en `DIR_SALIDA` (por defecto `salidas/<MES>/`):
+   - **`reporte_validacion.xlsx`** — validación de fuentes + concordancia.
+   - **`7.SEGUIMIENTO CONTRACTUAL SAVIA PPAL_<MES>.xlsm`** — la matriz diligenciada + **`reporte_llenado.xlsx`**.
 4. Abrir la matriz generada, revisarla con el `reporte_llenado.xlsx`, ajustar lo que falte,
    y correr las macros como siempre. Guía paso a paso en **[`docs/GUIA_DE_USO.md`](docs/GUIA_DE_USO.md)**.
 

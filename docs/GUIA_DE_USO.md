@@ -1,10 +1,12 @@
 # Guía de uso — corrida mensual
 
-Para el Analista de Información. No hay que programar nada: se ajustan 3 valores y se
-ejecuta un notebook. El resultado es **un Excel** que dice **qué revisar** y **dónde el
-proceso no coincide** con el diligenciamiento manual.
+Para el Analista de Información. No hay que programar nada: se ajustan unos valores en una
+celda y se ejecuta el notebook. Produce **la matriz del mes diligenciada** (las bandas que
+el proceso ya sabe llenar) más dos Excel de control que dicen **qué revisar** y **dónde no
+coincide** con el trabajo manual.
 
-> El proceso **solo lee**. No modifica la matriz ni los archivos de las áreas.
+> No modifica los archivos de las áreas ni la plantilla: escribe una **copia** en la
+> carpeta de salida, y verifica que las fórmulas y las macros de esa copia quedaron intactas.
 
 ---
 
@@ -39,31 +41,35 @@ jupyter lab
 
 En el navegador, abrir `notebooks/01_validacion_fuentes_y_concordancia.ipynb`.
 
-### 3. Ajustar los parámetros (segunda celda de código)
+### 3. Ajustar los parámetros — **solo la celda `①  Parámetros`**
 
 ```python
-MES         = "2026-08"                                      # el mes que se está cerrando, AAAA-MM
-RUTA_UNIDAD = r"Z:\10.INDICADORES SEGUIMIENTO CONTRACTUAL"   # raíz del disco compartido
-SUBCARPETA  = ""                                             # dejar vacío salvo que haya una carpeta por mes
+MES          = "2026-09"                                    # el mes que se está cerrando, AAAA-MM
+RUTA_FUENTES = r"Z:\10.INDICADORES SEGUIMIENTO CONTRACTUAL" # carpeta de insumos del mes
+SUBCARPETA   = ""                                           # subcarpeta del mes, si aplica
+PLANTILLA    = r"...\7.SEGUIMIENTO...AGOSTO.xlsm"           # la matriz del MES ANTERIOR
+MATRIZ_REFERENCIA = ""                                      # .xlsm ya diligenciado, solo para comparar
+DIR_SALIDA   = ""                                           # dónde dejar todo; vacío = salidas\<MES>
 ```
 
-- Los archivos se buscan **en todas las subcarpetas** de `RUTA_UNIDAD` (FINANCIERA, MIPRES,
-  AUTORIZACION, …). No hay que indicar cada ruta.
-- Si un mes hay **varios archivos** que sirven (p. ej. de meses distintos), toma el **más
-  reciente**.
-- `MATRIZ_OBJETIVO` solo se usa para comparar contra un mes ya diligenciado (validación).
-  Si no aplica, dejar la ruta que viene: si no existe, el notebook igual valida las fuentes.
+- `RUTA_FUENTES`: los archivos se buscan **en todas las subcarpetas** (FINANCIERA, MIPRES,
+  AUTORIZACION, …). No hay que indicar cada ruta. Si hay varios archivos que sirven, toma
+  el más reciente.
+- `PLANTILLA`: la matriz del mes anterior. Se **copia** y se diligencia; el original no se toca.
+- `MATRIZ_REFERENCIA`: opcional. Un `.xlsm` ya diligenciado para medir la concordancia. Vacío = no comparar.
+- `DIR_SALIDA`: los 3 resultados quedan juntos en esta carpeta.
+- Si una ruta no existe, el notebook usa la copia local de ejemplo y avisa (no se rompe).
 
 ### 4. Ejecutar todo
 
 Menú **Run → Run All Cells**. Tarda ~1–2 minutos.
 
-Al final produce dos cosas:
+Al final deja 3 archivos en `DIR_SALIDA` (por defecto `salidas\<MES>\`):
 
 ```
-salidas\validacion\<fecha>\reporte_validacion.xlsx          ← control de fuentes + concordancia
-salidas\<mes>\7.SEGUIMIENTO CONTRACTUAL SAVIA PPAL_<MES>.xlsm  ← la matriz diligenciada
-salidas\<mes>\reporte_llenado.xlsx                          ← control de lo que se llenó
+reporte_validacion.xlsx                       ← control de fuentes + concordancia
+7.SEGUIMIENTO CONTRACTUAL SAVIA PPAL_<MES>.xlsm  ← la matriz diligenciada
+reporte_llenado.xlsx                          ← control de lo que se llenó
 ```
 
 ### 5. Revisar
@@ -156,7 +162,7 @@ El disco compartido no está conectado. Conectarlo y volver a ejecutar. (Si solo
 probar con los datos de ejemplo, ignorar el aviso.)
 
 **Sale `[ERROR] NO se encontró la carpeta de insumos`.**
-La ruta de `RUTA_UNIDAD` está mal o la unidad no está montada. Corregir y reejecutar. El
+La ruta de `RUTA_FUENTES` está mal o la unidad no está montada. Corregir y reejecutar. El
 notebook no se cae: escribe un reporte con una sola hoja `ERROR`.
 
 **Una fuente sale `DRIFT` pero el área dice que no cambió nada.**
@@ -165,9 +171,10 @@ un espacio doble, "2024" → "2025" en el nombre de una hoja). Si el cambio es r
 correcto, se ajusta `config/fuentes.yaml` (lo hace quien mantiene el proyecto).
 
 **¿Esto ya llena la matriz?**
-Todavía no. Hoy el proceso **valida las fuentes** y **compara** lo que puede reconstruir
-contra el trabajo manual, para dirigir la revisión. El llenado del `.xlsm` es una fase
-siguiente (ver `docs/REEVALUACION_2026-09.md` §8).
+Sí, las **10 bandas con extractor** (Datos Generales, Auditoría, Financieros, Acceso,
+Concurrencia, MIPRES, Transporte, Medicamentos, Tutelas, Extramuralidad) — con ~96 % de
+concordancia contra el trabajo manual de julio. Las otras 8 bandas siguen siendo manuales
+hasta que se agreguen sus extractores (ver `docs/REEVALUACION_2026-09.md` §8).
 
 **¿Puedo correrlo sin Jupyter?**
 Sí: `python notebooks/validacion.py` (control de fuentes) y `python notebooks/escritor.py`

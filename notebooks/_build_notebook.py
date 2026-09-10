@@ -15,28 +15,26 @@ def md(s): c.append(nbf.v4.new_markdown_cell(s.strip("\n")))
 def code(s): c.append(nbf.v4.new_code_cell(s.strip("\n")))
 
 md(r"""
-# Validación de fuentes y concordancia contra la matriz objetivo
+# Diligenciamiento de la matriz de seguimiento contractual (FO-GC-47)
 
 **Qué hace este notebook**
 
-1. **Valida el esquema de cada fuente** de `docs/Insumos/` contra lo que se espera
-   (archivo presente · hoja correcta · columnas esperadas). Sirve para **detectar a futuro
-   si un área cambia el formato de su reporte** — si un mes cambian una hoja o una columna,
-   el notebook lo marca como `DRIFT` / `FALTA_HOJA` antes de que rompa nada.
-2. **Reconstruye** los componentes de la matriz que hoy son reproducibles a partir de los
-   insumos, y los **compara celda a celda contra la matriz ya diligenciada**
-   (`docs/Objetivo/…xlsm`) — la "verdad" de julio.
-3. Emite el **objeto reporte** (`salidas/validacion/<fecha>/reporte_validacion.xlsx`) con:
-   `resumen`, **`que_revisar`**, **`faltantes`**, `fuentes_esquema`, `discrepancias_indicaciones`,
-   `cobertura_matriz`, `concordancia_por_banda`, `concordancia_clasificacion`,
-   `concordancia_detalle`, `log_extraccion`.
+1. **Valida el esquema de cada fuente**: archivo presente · hoja correcta · columnas
+   esperadas. Si un área cambia el formato de su reporte, lo marca (`DRIFT` / `FALTA_HOJA`)
+   antes de que rompa nada.
+2. **Genera la matriz del mes** (§6): toma la plantilla del mes anterior y diligencia
+   `A3:NK` celda a celda para las bandas con extractor, sin tocar las fórmulas `NL:NO`,
+   las hojas `Informe_*` ni el VBA (lo verifica tras guardar).
+3. **Compara** contra una matriz de referencia (si se indica) y entrega los reportes de
+   control: `reporte_validacion.xlsx` y `reporte_llenado.xlsx`.
 
-**No escribe nada en la matriz. No toca los archivos fuente. Solo lee.**
-**No se rompe** si la unidad no está conectada o falta un insumo: lo reporta y sigue.
+Todo se controla desde la celda **①  Parámetros**. Los archivos fuente y la plantilla
+**no se tocan** — la salida es una copia en `DIR_SALIDA`. No se rompe si falta la unidad
+o un insumo: lo reporta y sigue.
 
-El mapa de fuentes vive en [`config/fuentes.yaml`](../config/fuentes.yaml)
-y la lógica en [`notebooks/validacion.py`](validacion.py). Para agregar un componente:
-añadir su extractor en `validacion.py` y registrarlo en `run()`.
+Lógica: [`validacion.py`](validacion.py) (fuentes + extractores + concordancia) y
+[`escritor.py`](escritor.py) (escritura del `.xlsm`). Mapa de fuentes:
+[`config/fuentes.yaml`](../config/fuentes.yaml).
 """)
 
 code(r"""
@@ -53,31 +51,69 @@ pd.set_option("display.max_colwidth", 70)
 pd.set_option("display.width", 200)
 
 import validacion as V
+import escritor as E
 print("raíz del proyecto:", RAIZ)
 """)
 
+md(r"""
+## ①  Parámetros — **editar solo esta celda**
+
+Definido esto, ejecutar todo (Run → Run All Cells) y pasar a revisar el resultado.
+""")
+
 code(r'''
-# ======================  PARÁMETROS DE LA CORRIDA  ============================
-MES = "2026-07"                       # AAAA-MM del mes a validar
+MES = "2026-07"                                  # mes que se cierra, AAAA-MM
 
-# --- Dónde están los insumos --------------------------------------------------
-# Poné aquí la letra/ruta de la unidad compartida. Se buscan los archivos
-# RECURSIVAMENTE (en todas las subcarpetas: FINANCIERA, MIPRES, AUTORIZACION, ...).
-RUTA_UNIDAD = r"Z:\10.INDICADORES SEGUIMIENTO CONTRACTUAL"
-SUBCARPETA  = ""                      # opcional: subcarpeta del mes bajo RUTA_UNIDAD
+# --- ENTRADA -----------------------------------------------------------------
+# Carpeta con los insumos del mes (disco compartido). Se busca RECURSIVAMENTE
+# en todas las subcarpetas (FINANCIERA, MIPRES, AUTORIZACION, ...).
+RUTA_FUENTES = r"Z:\10.INDICADORES SEGUIMIENTO CONTRACTUAL"
+SUBCARPETA   = ""                                # subcarpeta del mes bajo RUTA_FUENTES, si aplica
 
-# Fallback local mientras no haya acceso al disco compartido:
-if not Path(RUTA_UNIDAD).exists():
-    print(f"[aviso] no se ve la unidad {RUTA_UNIDAD!r} -> uso la copia local docs/Insumos")
-    RUTA_UNIDAD, SUBCARPETA = str(RAIZ / "docs" / "Insumos"), ""
+# Plantilla = la matriz del MES ANTERIOR (se copia y se diligencia; no se toca).
+PLANTILLA = r"Z:\10.INDICADORES SEGUIMIENTO CONTRACTUAL\A_SEGUIMIENTO CONTRACTUAL SAVIA\MATRIZ_MES\7.SEGUIMIENTO CONTRACTUAL SAVIA PPAL_JUNIO.xlsm"
 
-# --- Matriz objetivo (la ya diligenciada, para comparar) --------------------
-# Si no existe, el notebook igual valida las fuentes y avisa qué falta.
-MATRIZ_OBJETIVO = RAIZ / "docs" / "Objetivo" / "7.SEGUIMIENTO CONTRACTUAL SAVIA PPAL_JULIO.xlsm"
-# ==========================================================================
+# Matriz de referencia ya diligenciada, SOLO para comparar (opcional). "" = no comparar.
+MATRIZ_REFERENCIA = ""
 
-res = V.run(mes=MES, ruta_unidad=RUTA_UNIDAD, subcarpeta_insumos=SUBCARPETA,
-            matriz_objetivo=MATRIZ_OBJETIVO)
+# --- SALIDA ----------------------------------------------------------------
+# Carpeta donde dejar los resultados. "" = <proyecto>\salidas\<MES>\
+DIR_SALIDA = ""
+''')
+
+code(r'''
+# --- Resolución de rutas (no editar) --------------------------------------
+def _p(x):  # a Path si tiene contenido, si no None
+    return Path(x) if str(x).strip() else None
+
+RUTA_FUENTES_R = _p(RUTA_FUENTES)
+if RUTA_FUENTES_R is None or not RUTA_FUENTES_R.exists():
+    RUTA_FUENTES_R = RAIZ / "docs" / "Insumos"
+    print(f"[aviso] no se ve {RUTA_FUENTES!r} -> uso la copia local {RUTA_FUENTES_R}")
+
+PLANTILLA_R = _p(PLANTILLA)
+if PLANTILLA_R is None or not PLANTILLA_R.exists():
+    PLANTILLA_R = RAIZ / "docs" / "Insumos" / "7.SEGUIMIENTO CONTRACTUAL SAVIA PPAL_JULIO.xlsm"
+    print(f"[aviso] no se ve la plantilla indicada -> uso {PLANTILLA_R.name}")
+
+MATRIZ_REF_R = _p(MATRIZ_REFERENCIA)
+if MATRIZ_REF_R is None:
+    cand = RAIZ / "docs" / "Objetivo" / "7.SEGUIMIENTO CONTRACTUAL SAVIA PPAL_JULIO.xlsm"
+    MATRIZ_REF_R = cand if cand.exists() else None
+
+DIR_SALIDA_R = _p(DIR_SALIDA) or (RAIZ / "salidas" / MES)
+DIR_SALIDA_R.mkdir(parents=True, exist_ok=True)
+
+print("MES        :", MES)
+print("fuentes    :", RUTA_FUENTES_R, "/", SUBCARPETA or "(raíz)")
+print("plantilla  :", PLANTILLA_R)
+print("referencia :", MATRIZ_REF_R or "(sin comparación)")
+print("salida     :", DIR_SALIDA_R)
+''')
+
+code(r'''
+res = V.run(mes=MES, ruta_unidad=RUTA_FUENTES_R, subcarpeta_insumos=SUBCARPETA,
+            matriz_objetivo=MATRIZ_REF_R, salida=DIR_SALIDA_R)
 res["resumen"]
 ''')
 
@@ -192,13 +228,13 @@ else:
 """)
 
 md(r"""
-## 5. El objeto reporte
+## 5. El reporte de validación
 
-Todo lo anterior queda consolidado en un único `.xlsx` — es el entregable que revisa el analista.
+`reporte_validacion.xlsx` — el control de fuentes + concordancia. Queda en `DIR_SALIDA`.
 """)
 
 code(r"""
-print("Objeto reporte:", res["reporte"])
+print("Reporte:", res["reporte"])
 print("\nHojas:")
 import openpyxl
 wb = openpyxl.load_workbook(res["reporte"], read_only=True)
@@ -212,21 +248,16 @@ md(r"""
 ## 6. Generar la matriz del mes (escritura del `.xlsm`)
 
 Esto es el **objetivo**: a partir de los insumos, escribir la matriz diligenciada.
-Toma la **plantilla** (el `.xlsm` del mes anterior), limpia `A3:NK`, escribe celda a
-celda las bandas que hoy tienen extractor, y **verifica** que no se tocaron las fórmulas
-`NL:NO`, las hojas `Informe_*` ni el VBA.
+Toma la **plantilla** (`PLANTILLA`, el `.xlsm` del mes anterior), limpia `A3:NK`, escribe
+celda a celda las bandas que hoy tienen extractor, y **verifica** que no se tocaron las
+fórmulas `NL:NO`, las hojas `Informe_*` ni el VBA.
 
-Salida: `salidas/<mes>/7.SEGUIMIENTO CONTRACTUAL SAVIA PPAL_<MES>.xlsm` + `reporte_llenado.xlsx`.
+Salida: `DIR_SALIDA / 7.SEGUIMIENTO CONTRACTUAL SAVIA PPAL_<MES>.xlsm` + `reporte_llenado.xlsx`.
 """)
 
 code(r'''
-import escritor as E
-
-PLANTILLA = RAIZ / "docs" / "Insumos" / "7.SEGUIMIENTO CONTRACTUAL SAVIA PPAL_JULIO.xlsm"
-# En operación: el .xlsm del mes ANTERIOR (agosto para cerrar septiembre, etc.).
-
-gen = E.llenar(mes=MES, ruta_unidad=RUTA_UNIDAD, subcarpeta_insumos=SUBCARPETA,
-               plantilla_xlsm=PLANTILLA, matriz_objetivo=MATRIZ_OBJETIVO)
+gen = E.llenar(mes=MES, ruta_unidad=RUTA_FUENTES_R, subcarpeta_insumos=SUBCARPETA,
+               plantilla_xlsm=PLANTILLA_R, matriz_objetivo=MATRIZ_REF_R, salida=DIR_SALIDA_R)
 
 print("\\nMatriz generada :", gen["matriz"])
 print("Integridad VBA/fórmulas/plantillas:", "OK" if not gen["problemas_integridad"] else gen["problemas_integridad"])
